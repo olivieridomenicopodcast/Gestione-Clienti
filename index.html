@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Niky CRM</title>
+<link rel="manifest" href="./manifest.json"/>
+<link rel="apple-touch-icon" href="./icon-192.png"/>
+<link rel="icon" type="image/png" href="./icon-192.png"/>
+<meta name="theme-color" content="#6366f1"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@700;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1117;--surface:#1a1d27;--border:#2a2d3a;--text:#e8ecf4;--muted:#6b7280;--accent:#6366f1;--green:#10b981;--yellow:#f59e0b;--red:#ef4444}
+.light{--bg:#f4f6fb;--surface:#ffffff;--border:#e2e8f0;--text:#1a1d27;--muted:#64748b}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+button{cursor:pointer;border:none;background:none;font-family:inherit;color:inherit}
+input,select,textarea{font-family:inherit;outline:none;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:14px;width:100%;transition:.15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical}
+#app{display:flex;flex-direction:column;min-height:100dvh}
+header{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:8px;font-family:'Space Grotesk',sans-serif;font-weight:900;font-size:16px}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.nav-desktop{display:flex;gap:4px}
+@media(max-width:600px){.nav-desktop{display:none}}
+.nav-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;transition:.15s}
+.nav-btn.active{background:var(--accent);color:#fff}
+.nav-btn:not(.active){color:var(--muted)}
+.nav-btn:not(.active):hover{background:var(--border)}
+main{flex:1;max-width:900px;width:100%;margin:0 auto;padding:20px 16px 90px}
+@media(min-width:600px){main{padding-bottom:24px}}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:40}
+@media(min-width:600px){.bottom-nav{display:none}}
+.bottom-btn{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px;font-size:11px;font-weight:600;color:var(--muted)}
+.bottom-btn.active{color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px}
+.card-sm{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+@media(max-width:600px){.grid3{grid-template-columns:1fr 1fr}.grid5{grid-template-columns:1fr 1fr}}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;transition:.15s;cursor:pointer;white-space:nowrap}
+.btn:hover{opacity:.85}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-danger{background:#ef444420;border:1px solid #ef444440;color:#ef4444}
+.btn-green{background:#10b98120;border:1px solid #10b98140;color:#10b981}
+.btn-yellow{background:#f59e0b20;border:1px solid #f59e0b40;color:#f59e0b}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:20px;font-size:11px;font-weight:700;padding:2px 8px;white-space:nowrap}
+.badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;width:100%;max-width:560px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.5)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-body{padding:20px;overflow-y:auto;max-height:82vh}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.client-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s}
+.client-row:hover{border-color:var(--accent);transform:translateY(-1px)}
+.client-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;flex-shrink:0}
+/* project card */
+.proj-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;transition:.15s}
+.proj-card:hover{border-color:var(--accent)}
+.proj-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer}
+.proj-body{padding:0 16px 16px;border-top:1px solid var(--border)}
+.tl-item{display:flex;gap:12px;align-items:flex-start}
+.tl-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.pipeline-col{border-radius:12px;padding:12px;text-align:center}
+.pill{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap}
+.pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pill:hover:not(.active){border-color:var(--accent);color:var(--accent)}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper input{width:70px;text-align:center}
+.stepper-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:.15s}
+.stepper-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.prog-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin-top:6px}
+.prog-fill{height:100%;border-radius:3px;transition:.3s}
+.toggle-wrap{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.toggle{width:40px;height:22px;border-radius:11px;background:var(--border);position:relative;transition:.2s;flex-shrink:0}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.2s}
+.toggle.on::after{left:21px}
+.split-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+.split-row:last-child{border-bottom:none}
+.pay-mini{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:6px;font-size:13px;gap:8px}
+/* section label */
+.sec-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px}
+/* utils */
+.flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.gap1{gap:4px}.gap2{gap:8px}.gap3{gap:12px}
+.mt1{margin-top:4px}.mt2{margin-top:8px}.mt3{margin-top:12px}.mt4{margin-top:16px}
+.mb1{margin-bottom:4px}.mb2{margin-bottom:8px}.mb3{margin-bottom:12px}
+.space-y-2>*+*{margin-top:8px}.space-y-3>*+*{margin-top:12px}.space-y-4>*+*{margin-top:16px}
+.text-xs{font-size:11px}.text-sm{font-size:13px}.text-lg{font-size:18px}.text-xl{font-size:21px}.text-2xl{font-size:26px}.text-3xl{font-size:32px}
+.font-bold{font-weight:700}.font-black{font-weight:900}
+.muted{color:var(--muted)}.accent{color:var(--accent)}.green{color:var(--green)}.yellow{color:var(--yellow)}.red{color:var(--red)}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upper{text-transform:uppercase;letter-spacing:.06em}
+.w-full{width:100%}
+.chevron{transition:transform .2s;display:inline-block}
+.chevron.open{transform:rotate(90deg)}
+</style>
+</head>
+<body><div id="app"></div>
+<script>
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const STAGES=["Da contattare","Preventivo inviato","In attesa","In lavorazione","Completato"];
+const SC={"Da contattare":"#6366f1","Preventivo inviato":"#f59e0b","In attesa":"#ef4444","In lavorazione":"#10b981","Completato":"#64748b"};
+const SERVICES=["Montaggio Podcast","Podcasting Flow","Consulenza","Altro"];
+const PC={"Non pagato":"#ef4444","Parziale":"#f59e0b","Pagato":"#10b981"};
+const PROJ_STAGES=["Pianificato","In corso","Completato","Annullato"];
+const PSC={"Pianificato":"#6366f1","In corso":"#10b981","Completato":"#64748b","Annullato":"#ef4444"};
+// stato del singolo pagamento registrato
+const PAY_STATUS=["Pagato","Fattura da emettere","In attesa"];
+const PAY_STATUS_C={"Pagato":"#10b981","Fattura da emettere":"#f59e0b","In attesa":"#6366f1"};
+
+// ─── STORAGE ──────────────────────────────────────────────────────────────────
+const LS={
+  get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
+};
+const S={
+  clients: LS.get("crm_clients",[]),
+  events:  LS.get("crm_events",[]),
+  payments:LS.get("crm_payments",[]),
+  projects:LS.get("crm_projects",[]),
+  settings:LS.get("crm_settings",{businessName:"Niky CRM",alertDays:7,splits:{Tasse:25,"Fondo emergenza":10,Reinvestimento:15,Disponibile:50}}),
+  dark:LS.get("crm_dark",true),
+  page:"dashboard", selClient:null, selProject:null,
+  openProjects:{} // which project cards are expanded
+};
+function save(){
+  LS.set("crm_clients",S.clients);LS.set("crm_events",S.events);
+  LS.set("crm_payments",S.payments);LS.set("crm_projects",S.projects);
+  LS.set("crm_settings",S.settings);LS.set("crm_dark",S.dark);
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+const uid=()=>crypto.randomUUID?.()??Math.random().toString(36).slice(2);
+const today=()=>new Date().toISOString().split("T")[0];
+const fmt=n=>new Intl.NumberFormat("it-IT",{style:"currency",currency:"EUR"}).format(n||0);
+const fmtD=d=>d?new Date(d).toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"}):"—";
+const daysSince=d=>d?Math.floor((Date.now()-new Date(d).getTime())/86400000):999;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+// solo pagamenti effettivamente incassati (status Pagato) — amount già include la marca da bollo
+const projPaid=pid=>S.payments.filter(p=>p.projectId===pid&&p.status==="Pagato").reduce((s,p)=>s+Number(p.amount),0);
+// pagamenti in attesa/da emettere per un progetto — amount già include eventuale bollo
+const projPending=pid=>S.payments.filter(p=>p.projectId===pid&&p.status!=="Pagato").reduce((s,p)=>s+Number(p.amount),0);
+// conteggio bollo su tutti i pagamenti di un progetto (per mostrarlo nel totale)
+const projBolloCount=pid=>S.payments.filter(p=>p.projectId===pid&&p.marcaBollo).length;
+// all payments for a client (across all projects) — solo incassati, bollo incluso
+const clientPaid=cid=>S.payments.filter(p=>p.clientId===cid&&p.status==="Pagato").reduce((s,p)=>s+Number(p.amount),0);
+// total budgeted across client projects
+const clientBudget=cid=>S.projects.filter(p=>p.clientId===cid).reduce((s,p)=>s+Number(p.amount||0),0);
+
+function projPayState(pid,amount){
+  const p=projPaid(pid);
+  if(p<=0)return"Non pagato";
+  if(p>=Number(amount||0))return"Pagato";
+  return"Parziale";
+}
+function defSplits(amt){const o={};Object.entries(S.settings.splits).forEach(([k,v])=>o[k]=Number(amt)*v/100);return o;}
+
+function sBadge(stage,map){
+  map=map||SC;const c=map[stage]||"#64748b";
+  return`<span class="badge" style="background:${c}20;color:${c};border:1px solid ${c}40"><span class="badge-dot" style="background:${c}"></span>${stage}</span>`;
+}
+function pBadge(ps){const c=PC[ps]||"#64748b";return`<span class="badge" style="background:${c}20;color:${c};border:1px solid ${c}40">${ps}</span>`;}
+
+// ─── ICONS ────────────────────────────────────────────────────────────────────
+const IC={
+  dashboard:`<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>`,
+  clients:`<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+  finance:`<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+  settings:`<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+  mic:`<svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+  back:`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>`,
+  plus:`<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>`,
+  alert:`<svg width="18" height="18" fill="none" stroke="#ef4444" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`,
+  dl:`<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>`,
+  ul:`<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>`,
+  folder:`<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>`,
+  chevron:`<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>`,
+};
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render(){
+  document.body.className=S.dark?"":"light";
+  const nav=["dashboard","clients","finance","settings"];
+  const NL=["Dashboard","Clienti","Finanze","Impostazioni"];
+  const cur=S.page==="client"?"clients":S.page;
+  const dNav=nav.map((n,i)=>`<button class="nav-btn${cur===n?" active":""}" onclick="goTo('${n}')">${IC[n]}<span>${NL[i]}</span></button>`).join("");
+  const bNav=nav.map((n,i)=>`<button class="bottom-btn${cur===n?" active":""}" onclick="goTo('${n}')">${IC[n]}<span>${NL[i]}</span></button>`).join("");
+  let pg="";
+  if(S.page==="dashboard")pg=pgDash();
+  else if(S.page==="clients")pg=pgClients();
+  else if(S.page==="client")pg=pgDetail();
+  else if(S.page==="finance")pg=pgFinance();
+  else if(S.page==="settings")pg=pgSettings();
+  document.getElementById("app").innerHTML=`
+    <header>
+      <div class="logo"><div class="logo-icon">${IC.mic}</div>${S.settings.businessName||"Niky CRM"}</div>
+      <div class="flex items-center gap2">
+        <nav class="nav-desktop">${dNav}</nav>
+        <button class="btn btn-ghost btn-sm" onclick="toggleDark()">${S.dark?"☀️":"🌙"}</button>
+      </div>
+    </header>
+    <main>${pg}</main>
+    <nav class="bottom-nav">${bNav}</nav>`;
+}
+function goTo(p){S.page=p;S.selClient=null;S.selProject=null;render();}
+function openC(id){S.selClient=S.clients.find(c=>c.id===id)||null;S.page="client";render();}
+function toggleDark(){S.dark=!S.dark;save();render();}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function pgDash(){
+  const act=S.clients.filter(c=>!c.archived);
+  const sc=STAGES.reduce((a,s)=>({...a,[s]:act.filter(c=>c.stage===s).length}),{});
+  // incassato = solo pagamenti con status Pagato
+  const inc=S.payments.filter(p=>p.status==="Pagato").reduce((s,p)=>s+Number(p.amount),0);
+  // in attesa = pagamenti registrati ma non ancora Pagato
+  const attPays=S.payments.filter(p=>p.status!=="Pagato").reduce((s,p)=>s+Number(p.amount),0);
+  // potenziale = budget totale progetti attivi non ancora completamente incassato
+  const activeProjs=S.projects.filter(p=>!p.archived);
+  const pot=activeProjs.reduce((s,p)=>s+Number(p.amount||0),0);
+  const al=act.filter(c=>c.stage!=="Completato"&&daysSince(c.updatedAt)>=S.settings.alertDays);
+  return`<div class="space-y-4">
+  <div class="grid3">
+    ${[{l:"Incassato",v:fmt(inc),c:"var(--green)"},{l:"Pagamenti in attesa",v:fmt(attPays),c:"var(--yellow)"},{l:"Potenziale totale",v:fmt(pot),c:"var(--accent)"}].map(k=>`
+    <div class="card" style="border-color:${k.c}40"><div class="sec-label">${k.l}</div><div class="text-2xl font-black" style="color:${k.c}">${k.v}</div></div>`).join("")}
+  </div>
+  <div class="card"><div class="sec-label">Pipeline clienti attivi</div>
+  <div class="grid5">${STAGES.map(s=>`<div class="pipeline-col" style="background:${SC[s]}18;border:1px solid ${SC[s]}30"><div class="text-2xl font-black" style="color:${SC[s]}">${sc[s]||0}</div><div class="text-xs muted mt1">${s}</div></div>`).join("")}</div></div>
+  ${al.length?`<div class="card" style="background:#ef444410;border-color:#ef444430">
+  <div class="flex items-center gap2 mb3">${IC.alert}<span class="font-bold text-sm" style="color:#ef4444">Follow-up richiesto (${al.length})</span></div>
+  <div class="space-y-2">${al.map(c=>`<div class="flex items-center justify-between card-sm" style="cursor:pointer" onclick="openC('${c.id}')"><span class="font-bold text-sm">${c.name}</span><div class="flex items-center gap2">${sBadge(c.stage)}<span class="text-xs red">${daysSince(c.updatedAt)}g fa</span></div></div>`).join("")}</div></div>`:""}
+  <div class="flex justify-between items-center">
+    <span class="text-sm muted">${act.length} clienti · ${activeProjs.length} progetti attivi</span>
+    <button class="btn btn-primary" onclick="openClientModal(null)">${IC.plus} Nuovo cliente</button>
+  </div>
+  </div>`;
+}
+
+// ─── CLIENTS LIST ─────────────────────────────────────────────────────────────
+let _fs="Tutti",_sr="",_sa=false;
+function pgClients(){
+  const fl=S.clients.filter(c=>{
+    if(!_sa&&c.archived)return false;if(_sa&&!c.archived)return false;
+    if(_fs!=="Tutti"&&c.stage!==_fs)return false;
+    if(_sr&&!c.name.toLowerCase().includes(_sr.toLowerCase())&&!(c.email||"").toLowerCase().includes(_sr.toLowerCase()))return false;
+    return true;
+  });
+  return`<div class="space-y-3">
+  <div class="flex gap2" style="flex-wrap:wrap">${["Tutti",...STAGES].map(s=>`<button class="pill${_fs===s?" active":""}" onclick="setF('${s}')">${s}</button>`).join("")}</div>
+  <div class="flex gap2 justify-between" style="flex-wrap:wrap">
+    <input type="search" placeholder="🔍 Cerca cliente..." value="${_sr.replace(/"/g,'&quot;')}" oninput="setSR(this.value)" style="max-width:220px"/>
+    <div class="flex gap2">
+      <button class="btn btn-ghost btn-sm" onclick="toggleSA()">${_sa?"← Attivi":"📦 Archiviati"}</button>
+      <button class="btn btn-primary btn-sm" onclick="openClientModal(null)">${IC.plus} Nuovo</button>
+    </div>
+  </div>
+  <div class="space-y-2">
+    ${fl.length===0?`<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Nessun cliente trovato.</div>`:""}
+    ${fl.map(c=>{
+      const cProjs=S.projects.filter(p=>p.clientId===c.id&&!p.archived);
+      const cPaid=clientPaid(c.id);
+      const cBudget=clientBudget(c.id);
+      const pct=cBudget>0?Math.min(100,cPaid/cBudget*100):0;
+      const ps=cBudget===0?"Non pagato":cPaid<=0?"Non pagato":cPaid>=cBudget?"Pagato":"Parziale";
+      const stageColor=SC[c.stage]||"#64748b";
+      return`<div class="client-row" onclick="openC('${c.id}')" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div class="flex items-center gap3">
+          <div class="client-avatar" style="background:${stageColor}20;color:${stageColor}">${(c.name||"?").charAt(0).toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div class="font-bold" style="color:var(--text);font-size:15px">${c.name||"(senza nome)"}</div>
+            <div class="text-xs muted">${c.service||""} · ${cProjs.length} progett${cProjs.length===1?"o":"i"}</div>
+          </div>
+          <div class="flex gap1" style="flex-shrink:0">
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openClientModal('${c.id}')">✏️</button>
+            ${!c.archived?`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();archC('${c.id}')">📦</button>`:""}
+          </div>
+        </div>
+        <div class="flex items-center gap2" style="flex-wrap:wrap">
+          ${sBadge(c.stage)}
+          ${pBadge(ps)}
+          ${cBudget?`<span class="text-sm font-bold" style="color:var(--text)">${fmt(cBudget)}</span>`:""}
+          ${cBudget>0?`<div class="prog-bar" style="flex:1;min-width:60px"><div class="prog-fill" style="width:${pct}%;background:${PC[ps]}"></div></div>`:""}
+        </div>
+      </div>`;}).join("")}
+  </div></div>`;
+}
+function setF(s){_fs=s;render();}function setSR(v){_sr=v;render();}function toggleSA(){_sa=!_sa;render();}
+function archC(id){
+  if(!confirm("Archiviare questo cliente? Rimarrà accessibile dalla sezione Archiviati."))return;
+  S.clients=S.clients.map(c=>c.id===id?{...c,archived:true,updatedAt:today()}:c);save();render();
+}
+
+// ─── CLIENT DETAIL ────────────────────────────────────────────────────────────
+function pgDetail(){
+  const c=S.clients.find(x=>x.id===S.selClient?.id)||S.selClient;
+  if(!c)return`<button class="btn btn-ghost" onclick="goTo('clients')">${IC.back} Torna ai clienti</button>`;
+
+  const cProjs=S.projects.filter(p=>p.clientId===c.id&&!p.archived);
+  const archProjs=S.projects.filter(p=>p.clientId===c.id&&p.archived);
+  const cPaid=clientPaid(c.id);
+  const cBudget=clientBudget(c.id);
+  const rem=Math.max(0,cBudget-cPaid);
+  const ps=cBudget===0?"Non pagato":cPaid<=0?"Non pagato":cPaid>=cBudget?"Pagato":"Parziale";
+  const pct=cBudget>0?Math.min(100,cPaid/cBudget*100):0;
+  const evts=S.events.filter(e=>e.clientId===c.id).sort((a,b)=>b.date.localeCompare(a.date));
+  const eI={create:"➕",edit:"✏️",note:"📝",stage:"🔄",payment:"💰"};
+
+  // render project cards
+  function projCard(proj){
+    const pp=projPaid(proj.id);         // incassato (include bollo già nel amount)
+    const ppend=projPending(proj.id);   // in attesa (include bollo già nel amount)
+    const bolloCount=projBolloCount(proj.id);
+    const totalPays=pp+ppend;           // tutto registrato, pagato + in attesa
+    const pps=projPayState(proj.id,proj.amount);
+    const ppct=proj.amount>0?Math.min(100,pp/proj.amount*100):0;
+    const prem=Math.max(0,Number(proj.amount||0)-pp);
+    const pPays=S.payments.filter(p=>p.projectId===proj.id).sort((a,b)=>b.date.localeCompare(a.date));
+    const open=!!S.openProjects[proj.id];
+    const pc=PSC[proj.stage]||"#64748b";
+    return`<div class="proj-card" id="pc-${proj.id}">
+      <div class="proj-header" onclick="toggleProj('${proj.id}')">
+        <div style="flex:1;min-width:0">
+          <div class="flex items-center gap2 mb1">
+            <span style="font-size:14px">📁</span>
+            <span class="font-bold text-sm" style="color:var(--text)">${proj.name||"Progetto senza nome"}</span>
+            ${sBadge(proj.stage,PSC)}
+          </div>
+          <div class="text-xs muted">${proj.service||""} ${proj.amount?`· <strong style="color:var(--text)">${fmt(Number(proj.amount))}</strong>`:""} ${proj.startDate?`· ${fmtD(proj.startDate)}`:""}</div>
+          ${proj.amount>0?`<div class="prog-bar" style="max-width:200px"><div class="prog-fill" style="width:${ppct}%;background:${PC[pps]}"></div></div>`:""}
+        </div>
+        <div class="flex items-center gap2" style="flex-shrink:0">
+          ${pBadge(pps)}
+          <span class="chevron${open?" open":""}">${IC.chevron}</span>
+        </div>
+      </div>
+      ${open?`<div class="proj-body mt2">
+        <!-- financial summary -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+          <div class="card-sm" style="background:var(--bg);border-color:#10b98130">
+            <div class="sec-label">Pagato</div>
+            <div class="font-black" style="color:var(--green)">${fmt(pp)}</div>
+            ${bolloCount>0?`<div class="text-xs muted">incl. ${bolloCount}× bollo</div>`:""}
+          </div>
+          <div class="card-sm" style="background:var(--bg);border-color:#f59e0b30">
+            <div class="sec-label">In attesa</div>
+            <div class="font-black" style="color:var(--yellow)">${fmt(ppend)}</div>
+          </div>
+          <div class="card-sm" style="background:var(--bg)">
+            <div class="sec-label">Budget</div>
+            <div class="font-black" style="color:var(--text)">${fmt(Number(proj.amount))}</div>
+          </div>
+        </div>
+
+        <!-- fase progetto -->
+        <div class="sec-label">Fase progetto</div>
+        <div class="flex gap2 mb3" style="flex-wrap:wrap">
+          ${PROJ_STAGES.map(ps=>`<button class="pill${proj.stage===ps?" active":""}" style="${proj.stage===ps?`background:${PSC[ps]};border-color:${PSC[ps]};color:#fff`:""}" onclick="chProjStage('${proj.id}','${ps}')">${ps}</button>`).join("")}
+        </div>
+
+        <!-- payments list -->
+        <div class="flex justify-between items-center mb2">
+          <div class="sec-label" style="margin:0">Pagamenti</div>
+          <button class="btn btn-primary btn-sm" onclick="openPayModal('${c.id}','${proj.id}')">${IC.plus} Aggiungi</button>
+        </div>
+        ${pPays.length===0?`<div class="text-xs muted mb3">Nessun pagamento ancora.</div>`:""}
+        ${pPays.map(p=>{
+          const sc2=PAY_STATUS_C[p.status]||"#64748b";
+          return`<div class="pay-mini">
+          <div style="flex:1;min-width:0">
+            <div class="flex items-center gap2 mb1">
+              <span class="font-bold" style="color:${p.status==="Pagato"?"var(--green)":"var(--yellow)"}">${fmt(p.amount)}${p.marcaBollo?` <span class="text-xs muted">(+€2 bollo)</span>`:""}</span>
+              <span class="badge" style="background:${sc2}20;color:${sc2};border:1px solid ${sc2}40;font-size:10px">${p.status||"Pagato"}</span>
+            </div>
+            <div class="text-xs muted">${p.note||"—"} · ${fmtD(p.date)}</div>
+            <div class="text-xs mt1">${p.customSplits?`<span style="color:var(--accent)">⚙️ ${p.customSplitsMode==="pct"?"% custom":"€ custom"}</span>`:`<span class="muted">📊 default</span>`}</div>
+          </div>
+          <div class="flex gap1">
+            <button class="btn btn-ghost btn-sm" onclick="openPayModal('${c.id}','${proj.id}','${p.id}')">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="delPay('${p.id}','${c.id}')">🗑</button>
+          </div>
+        </div>`;}).join("")}
+
+        <!-- links & podcast details -->
+        <div class="mt3" style="border-top:1px solid var(--border);padding-top:12px">
+
+          ${(proj.linkPreventivo||proj.linkForm)?`
+          <div class="sec-label mb2">🔗 Link documenti</div>
+          <div class="flex gap2 mb3" style="flex-wrap:wrap">
+            ${proj.linkPreventivo?`<a href="${proj.linkPreventivo}" target="_blank" class="btn btn-ghost btn-sm">📄 Preventivo</a>`:""}
+            ${proj.linkForm?`<a href="${proj.linkForm}" target="_blank" class="btn btn-ghost btn-sm">📋 Form cliente</a>`:""}
+          </div>`:""}
+
+          ${(proj.numPuntate||proj.prezzoPuntata||proj.lunghezzaPuntate||proj.distribuzione||proj.sonorizzazione||proj.trailer==="si")?`
+          <div class="sec-label mb2">🎙️ Dettagli podcast</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+            ${proj.numPuntate?`<div class="card-sm" style="background:var(--bg);padding:10px"><div class="text-xs muted mb1">N° puntate</div><div class="font-bold">${proj.numPuntate}</div></div>`:""}
+            ${proj.prezzoPuntata?`<div class="card-sm" style="background:var(--bg);padding:10px"><div class="text-xs muted mb1">Prezzo/puntata</div><div class="font-bold" style="color:var(--accent)">${fmt(proj.prezzoPuntata)}</div></div>`:""}
+            ${proj.lunghezzaPuntate?`<div class="card-sm" style="background:var(--bg);padding:10px"><div class="text-xs muted mb1">Lunghezza</div><div class="font-bold">${proj.lunghezzaPuntate}</div></div>`:""}
+            ${proj.distribuzione?`<div class="card-sm" style="background:var(--bg);padding:10px"><div class="text-xs muted mb1">Distribuzione</div><div class="font-bold">${proj.distribuzione==="si"?"✅ Sì":"❌ No"}${proj.prezzoDistribuzione?` · ${fmt(proj.prezzoDistribuzione)}`:""}</div></div>`:""}
+            ${proj.trailer==="si"?`<div class="card-sm" style="background:var(--bg);padding:10px"><div class="text-xs muted mb1">Trailer</div><div class="font-bold">✅ Sì${proj.prezzoTrailer?` · ${fmt(proj.prezzoTrailer)}`:""}</div></div>`:""}
+          </div>
+          ${proj.sonorizzazione?`<div class="text-xs muted mb1">Sonorizzazione</div><div class="text-sm mb3">${proj.sonorizzazione}</div>`:""}
+          ${(proj.rivalsaINPS||proj.marcaBollo)?`<div class="text-xs muted">${proj.rivalsaINPS?"✓ Rivalsa INPS 4% inclusa":""} ${proj.marcaBollo?"· ✓ Marca da bollo €2,00":""}</div><div class="mt1 mb2"></div>`:""}
+          `:""}
+          <div class="card-sm" style="background:var(--bg);border-color:var(--accent)30">
+            <div class="flex justify-between items-center">
+              <span class="text-xs upper muted">Totale progetto</span>
+              <span class="font-black" style="color:var(--accent);font-size:18px">${fmt(proj.amount)}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- materiale ricevuto -->
+        <div class="flex items-center gap2 mb3" style="padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer" onclick="toggleMateriale('${proj.id}')">
+          <div class="toggle${proj.materialeRicevuto?' on':''}" style="flex-shrink:0"></div>
+          <div>
+            <div class="font-bold text-sm">Materiale ricevuto</div>
+            <div class="text-xs muted">${proj.materialeRicevuto?'✅ Ricevuto':'⏳ In attesa'}</div>
+          </div>
+        </div>
+        <!-- edit/archive project -->
+        <div class="flex gap2 mt3">
+          <button class="btn btn-ghost btn-sm" onclick="openProjModal('${c.id}','${proj.id}')">✏️ Modifica</button>
+          <button class="btn btn-danger btn-sm" onclick="archProj('${proj.id}')">📦 Archivia</button>
+        <button class="btn btn-danger btn-sm" onclick="delProj('${proj.id}','${c.id}')">🗑 Elimina</button>
+        </div>
+
+        ${proj.notes?`<div class="text-xs muted mt2" style="white-space:pre-wrap">${proj.notes}</div>`:""}
+      </div>`:""}
+    </div>`;
+  }
+
+  return`<div class="space-y-4">
+  <!-- client header -->
+  <div class="flex items-center gap3">
+    <button class="btn btn-ghost btn-sm" onclick="goTo('clients')">${IC.back}</button>
+    <div class="client-avatar" style="background:${SC[c.stage]}20;color:${SC[c.stage]};width:44px;height:44px;font-size:18px">${(c.name||"?").charAt(0).toUpperCase()}</div>
+    <div style="flex:1;min-width:0">
+      <div class="text-xl font-black truncate" style="color:var(--text)">${c.name||"(senza nome)"}</div>
+      <div class="flex gap2 mt1" style="flex-wrap:wrap">${sBadge(c.stage)} <span class="text-xs muted">${c.service||""}</span></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="openClientModal('${c.id}')">✏️ Modifica</button>
+  </div>
+
+  <!-- riepilogo economico cliente -->
+  <div class="card">
+    <div class="sec-label">Riepilogo economico cliente</div>
+    <div class="grid3 mb3">
+      <div><div class="text-xs muted mb1">Budget totale</div><div class="text-2xl font-black accent">${fmt(cBudget)}</div></div>
+      <div><div class="text-xs muted mb1">Incassato</div><div class="text-2xl font-black green">${fmt(cPaid)}</div></div>
+      <div><div class="text-xs muted mb1">Mancante</div><div class="text-2xl font-black" style="color:var(--yellow)">${fmt(rem)}</div></div>
+    </div>
+    ${cBudget>0?`<div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${PC[ps]}"></div></div>
+    <div class="flex justify-between mt1 text-xs muted"><span>Pagato: <strong style="color:var(--green)">${fmt(cPaid)}</strong></span><span>${pBadge(ps)}</span></div>`:""}
+  </div>
+
+  <!-- contatti -->
+  <div class="grid2">
+    <div class="card">
+      <div class="sec-label">Contatti</div>
+      ${c.email?`<div class="text-sm mb1">✉️ <a href="mailto:${c.email}" style="color:var(--accent)">${c.email}</a></div>`:"<div class='text-xs muted'>Nessuna email</div>"}
+      ${c.phone?`<div class="text-sm mb1">📞 ${c.phone}</div>`:""}
+      <div class="text-xs muted mt2">Cliente dal ${fmtD(c.createdAt)}</div>
+    </div>
+    <div class="card">
+      <div class="sec-label">Fase</div>
+      <div class="flex gap2 mt1" style="flex-wrap:wrap">
+        ${STAGES.map(s=>`<button class="pill${c.stage===s?" active":""}" style="${c.stage===s?`background:${SC[s]};border-color:${SC[s]};color:#fff`:""}" onclick="chStage('${c.id}','${s}')" style="font-size:11px">${s}</button>`).join("")}
+      </div>
+    </div>
+  </div>
+
+  <!-- progetti -->
+  <div>
+    <div class="flex justify-between items-center mb3">
+      <div class="sec-label" style="margin:0">Progetti (${cProjs.length})</div>
+      <button class="btn btn-primary btn-sm" onclick="openProjModal('${c.id}',null)">${IC.plus} Nuovo progetto</button>
+    </div>
+    ${cProjs.length===0?`<div class="card-sm text-sm muted" style="text-align:center;background:var(--bg)">Nessun progetto ancora. Aggiungine uno!</div>`:""}
+    ${cProjs.map(p=>projCard(p)).join("")}
+    ${archProjs.length?`
+    <div class="mt2">
+      <button onclick="toggleArchProjList()" class="flex items-center gap2 text-xs muted" style="padding:8px 0;font-weight:600">
+        <span class="chevron" id="arch-chev">${IC.chevron}</span>
+        Progetti archiviati (${archProjs.length})
+      </button>
+      <div id="arch-proj-list" style="display:none;margin-top:6px">
+        ${archProjs.map(p=>projCard(p)).join("")}
+      </div>
+    </div>`:""}
+  </div>
+
+  ${c.notes?`<div class="card"><div class="sec-label">Note cliente</div><div class="text-sm" style="white-space:pre-wrap">${c.notes}</div></div>`:""}
+
+  <!-- timeline -->
+  <div class="card">
+    <button onclick="toggleTimeline()" class="flex items-center gap2 w-full" style="text-align:left">
+      <span class="sec-label" style="margin:0;flex:1">Timeline (${evts.length})</span>
+      <span class="chevron" id="tl-chev">${IC.chevron}</span>
+    </button>
+    <div id="tl-body" style="display:none;margin-top:12px">
+      <div class="flex gap2 mb3">
+        <input id="nni" type="text" placeholder="Aggiungi nota..." style="flex:1" onkeydown="if(event.key==='Enter')addNote('${c.id}')"/>
+        <button class="btn btn-primary btn-sm" onclick="addNote('${c.id}')">Aggiungi</button>
+      </div>
+      <div class="space-y-3">
+        ${evts.length===0?`<div class="text-xs muted">Nessun evento.</div>`:""}
+        ${evts.slice(0,20).map(ev=>`<div class="tl-item">
+          <div class="tl-dot" style="background:${ev.type==="payment"?"#10b98120":ev.type==="stage"?"#6366f120":"#64748b20"}">${eI[ev.type]||"📝"}</div>
+          <div><div class="text-sm">${ev.text}</div><div class="text-xs muted mt1">${fmtD(ev.date)}</div></div>
+        </div>`).join("")}
+      </div>
+    </div>
+  </div></div>`;
+}
+
+function toggleProj(pid){S.openProjects[pid]=!S.openProjects[pid];render();}
+function chStage(cid,stage){
+  S.clients=S.clients.map(c=>c.id===cid?{...c,stage,updatedAt:today()}:c);
+  S.events=[...S.events,{id:uid(),clientId:cid,date:today(),text:`Fase cliente → ${stage}`,type:"stage"}];
+  S.selClient=S.clients.find(c=>c.id===cid);save();render();
+}
+function chProjStage(pid,stage){
+  const proj=S.projects.find(p=>p.id===pid);if(!proj)return;
+  S.projects=S.projects.map(p=>p.id===pid?{...p,stage}:p);
+  S.events=[...S.events,{id:uid(),clientId:proj.clientId,date:today(),text:`Progetto "${proj.name}" → ${stage}`,type:"stage"}];
+  S.selClient=S.clients.find(c=>c.id===proj.clientId);save();render();
+}
+function toggleMateriale(pid){
+  S.projects=S.projects.map(p=>p.id===pid?{...p,materialeRicevuto:!p.materialeRicevuto}:p);
+  S.selClient=S.selClient?S.clients.find(cl=>cl.id===S.selClient.id):null;
+  save();render();
+}
+function delProj(pid,clientId){
+  const proj=S.projects.find(p=>p.id===pid);if(!proj)return;
+  if(!confirm(`Eliminare definitivamente il progetto "${proj.name}"?\nI pagamenti associati NON verranno eliminati.`))return;
+  S.projects=S.projects.filter(p=>p.id!==pid);
+  S.events=[...S.events,{id:uid(),clientId,date:today(),text:`Progetto "${proj.name}" eliminato`,type:"edit"}];
+  S.selClient=S.clients.find(c=>c.id===clientId);
+  save();render();
+}
+function archProj(pid){
+  const proj=S.projects.find(p=>p.id===pid);if(!proj)return;
+  if(!confirm(`Archiviare il progetto "${proj.name}"?`))return;
+  S.projects=S.projects.map(p=>p.id===pid?{...p,archived:true}:p);
+  save();render();
+}
+function addNote(cid){
+  const inp=document.getElementById("nni");if(!inp||!inp.value.trim())return;
+  S.events=[...S.events,{id:uid(),clientId:cid,date:today(),text:inp.value.trim(),type:"note"}];
+  S.clients=S.clients.map(c=>c.id===cid?{...c,updatedAt:today()}:c);
+  S.selClient=S.clients.find(c=>c.id===cid);save();render();
+}
+function delPay(pid,cid){
+  if(!confirm("Eliminare questo pagamento? L'operazione non è reversibile."))return;
+  S.payments=S.payments.filter(p=>p.id!==pid);
+  S.events=[...S.events,{id:uid(),clientId:cid,date:today(),text:"Pagamento eliminato",type:"edit"}];
+  S.selClient=S.clients.find(c=>c.id===cid);save();render();
+}
+
+// ─── FINANCE ─────────────────────────────────────────────────────────────────
+let _fv="mensile";
+function pgFinance(){
+  const paid=S.payments.filter(p=>p.status==="Pagato");
+  const pending=S.payments.filter(p=>p.status!=="Pagato");
+  const tot=paid.reduce((s,p)=>s+Number(p.amount),0);
+  const totPending=pending.reduce((s,p)=>s+Number(p.amount),0);
+  // ripartizione solo su pagamenti effettivamente incassati
+  const st={};Object.keys(S.settings.splits).forEach(k=>st[k]=0);
+  paid.forEach(p=>{const sp=p.customSplits||defSplits(p.amount);Object.entries(sp).forEach(([k,v])=>{if(st[k]===undefined)st[k]=0;st[k]+=Number(v);});});
+  const bM=S.payments.reduce((a,p)=>{const k=p.date?.slice(0,7)||"N/A";if(!a[k])a[k]=[];a[k].push(p);return a},{});
+  const bY=paid.reduce((a,p)=>{const y=p.date?.slice(0,4)||"N/A";a[y]=(a[y]||0)+Number(p.amount);return a},{});
+  return`<div class="space-y-4">
+  <div class="card">
+    <div class="grid2 mb3">
+      <div><div class="sec-label">Totale incassato</div><div class="text-3xl font-black green">${fmt(tot)}</div></div>
+      <div><div class="sec-label">In attesa / da fatturare</div><div class="text-2xl font-black" style="color:var(--yellow)">${fmt(totPending)}</div></div>
+    </div>
+    <div class="sec-label">Ripartizione cumulativa (incassato)</div>
+    ${Object.entries(st).map(([k,v])=>`<div class="split-row"><span class="muted">${k}</span><span class="font-bold">${fmt(v)}</span></div>`).join("")}
+  </div>
+  <div class="flex items-center justify-between">
+    <div class="flex gap2">${["mensile","annuale"].map(m=>`<button class="pill${_fv===m?" active":""}" onclick="setFV('${m}')">${m}</button>`).join("")}</div>
+    <button class="btn btn-primary btn-sm" onclick="openPayModal(null,null)">${IC.plus} Registra</button>
+  </div>
+  ${_fv==="mensile"?`<div class="space-y-3">
+    ${Object.keys(bM).length===0?`<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Nessun pagamento.</div>`:""}
+    ${Object.entries(bM).sort((a,b)=>b[0].localeCompare(a[0])).map(([mo,ps])=>`
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="flex justify-between items-center" style="padding:12px 16px;border-bottom:1px solid var(--border)">
+        <span class="font-bold text-sm">${mo}</span><span class="font-black green">${fmt(ps.reduce((s,p)=>s+Number(p.amount),0))}</span>
+      </div>
+      ${ps.map(p=>{
+        const cl=S.clients.find(c=>c.id===p.clientId);
+        const proj=p.projectId?S.projects.find(pr=>pr.id===p.projectId):null;
+        const sc2=PAY_STATUS_C[p.status]||"#10b981";
+        return`<div class="flex justify-between items-center" style="padding:10px 16px;border-bottom:1px solid var(--border)">
+          <div>
+            <div class="text-sm font-bold">${cl?.name||"—"}</div>
+            <div class="text-xs muted">${proj?`📁 ${proj.name} · `:""}${p.note||""} · ${fmtD(p.date)}</div>
+          </div>
+          <div class="flex items-center gap2">
+            <span class="badge" style="background:${sc2}20;color:${sc2};border:1px solid ${sc2}40;font-size:10px">${p.status||"Pagato"}</span>
+            <span class="font-bold text-sm" style="color:${sc2}">${fmt(Number(p.amount))}</span>
+          </div>
+        </div>`;}).join("")}
+    </div>`).join("")}
+  </div>`:`<div class="card" style="padding:0;overflow:hidden">
+    ${Object.entries(bY).sort((a,b)=>b[0].localeCompare(a[0])).map(([y,t])=>`
+    <div class="flex justify-between items-center" style="padding:14px 16px;border-bottom:1px solid var(--border)">
+      <span class="font-bold">${y}</span><span class="font-black text-lg green">${fmt(t)}</span>
+    </div>`).join("")}
+    ${Object.keys(bY).length===0?`<div style="padding:40px;text-align:center;color:var(--muted)">Nessun dato.</div>`:""}
+  </div>`}
+  </div>`;
+}
+function setFV(v){_fv=v;render();}
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+function pgSettings(){
+  const sp=S.settings.splits;
+  const tot=Object.values(sp).reduce((a,v)=>a+Number(v),0);
+  return`<div class="space-y-4" style="max-width:540px">
+  <div class="card"><div class="font-bold mb3">Attività</div>
+    <div class="field"><label>Nome attività</label><input id="s-name" value="${S.settings.businessName||''}"/></div>
+    <div class="field"><label>Giorni per alert follow-up</label><input id="s-days" type="number" value="${S.settings.alertDays||7}" min="1"/></div>
+  </div>
+  <div class="card">
+    <div class="font-bold mb1">Ripartizione pagamenti</div>
+    <div class="text-sm muted mb3">Totale: <strong id="split-tot" style="color:${tot!==100?"#ef4444":"#10b981"}">${tot}%</strong> — deve fare 100%</div>
+    <div id="splits-list">
+      ${Object.entries(sp).map(([k,v])=>`
+      <div class="flex items-center gap2 mb3" data-key="${k}">
+        <input class="snk" value="${k}" style="flex:1" onchange="renSplit('${k}',this.value)"/>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="stepSplit('${k}',-5)">−</button>
+          <input class="snv" type="number" value="${v}" min="0" max="100" style="width:64px;text-align:center" oninput="updSplit('${k}',this.value)"/>
+          <button class="stepper-btn" onclick="stepSplit('${k}',5)">+</button>
+        </div>
+        <span class="muted text-xs">%</span>
+        <button class="btn btn-danger btn-sm" onclick="remSplit('${k}')">✕</button>
+      </div>`).join("")}
+    </div>
+    <div class="flex gap2 mt3">
+      <input id="ns-k" placeholder="Nome voce..." style="flex:1"/>
+      <input id="ns-v" type="number" placeholder="%" style="width:70px"/>
+      <button class="btn btn-ghost btn-sm" onclick="addSplit()">${IC.plus}</button>
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="saveSettings()">✓ Salva impostazioni</button>
+  <div class="card">
+    <div class="font-bold mb1">💾 Backup & Ripristino</div>
+    <div class="text-sm muted mb3">Esporta tutti i dati in JSON e importali su un altro dispositivo o dopo aver svuotato la cache.</div>
+    <div class="flex gap2" style="flex-wrap:wrap">
+      <button class="btn btn-green" onclick="doExport()">${IC.dl} Esporta backup</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('imp-f').click()">${IC.ul} Importa backup</button>
+      <input type="file" id="imp-f" accept=".json" style="display:none" onchange="doImport(this)"/>
+    </div>
+    <div id="bk-msg" class="text-sm mt2"></div>
+  </div>
+  <div class="card" style="border-color:#ef444440">
+    <div class="font-bold mb1" style="color:#ef4444">⚠️ Zona pericolo</div>
+    <div class="text-sm muted mb3">Cancella tutti i dati dell'app (clienti, progetti, pagamenti, eventi). Le impostazioni vengono mantenute. Irreversibile.</div>
+    <button class="btn btn-danger" onclick="resetApp()">🗑 Reset completo app</button>
+  </div>
+  </div>`;
+}
+function stepSplit(k,d){S.settings.splits[k]=clamp(Number(S.settings.splits[k]||0)+d,0,100);save();render();}
+function updSplit(k,v){S.settings.splits[k]=clamp(Number(v),0,100);save();updateSplitTot();}
+function updateSplitTot(){const t=Object.values(S.settings.splits).reduce((a,v)=>a+Number(v),0);const el=document.getElementById("split-tot");if(el){el.textContent=t+"%";el.style.color=t!==100?"#ef4444":"#10b981";}}
+function renSplit(ok,nk){if(!nk||nk===ok)return;const ns={};Object.entries(S.settings.splits).forEach(([k,v])=>{ns[k===ok?nk:k]=v;});S.settings.splits=ns;save();}
+function remSplit(k){delete S.settings.splits[k];save();render();}
+function addSplit(){const k=document.getElementById("ns-k")?.value.trim();const v=document.getElementById("ns-v")?.value;if(k&&v){S.settings.splits[k]=clamp(Number(v),0,100);save();render();}}
+function saveSettings(){
+  S.settings.businessName=document.getElementById("s-name")?.value||"Niky CRM";
+  S.settings.alertDays=Number(document.getElementById("s-days")?.value)||7;
+  document.querySelectorAll("#splits-list [data-key]").forEach(r=>{const k=r.dataset.key;const i=r.querySelector(".snv");if(i)S.settings.splits[k]=clamp(Number(i.value),0,100);});
+  save();render();showMsg("bk-msg","✓ Salvato","#10b981");
+}
+function doExport(){
+  const d={clients:S.clients,events:S.events,payments:S.payments,projects:S.projects,settings:S.settings,exportedAt:new Date().toISOString()};
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:"application/json"}));
+  a.download=`niky-crm-backup-${today()}.json`;a.click();URL.revokeObjectURL(a.href);
+}
+function doImport(inp){
+  const f=inp.files[0];if(!f)return;
+  const r=new FileReader();r.onload=e=>{
+    try{const d=JSON.parse(e.target.result);
+      if(!d.clients)throw 0;
+      const ts=d.exportedAt?new Date(d.exportedAt).toLocaleString("it-IT"):"data sconosciuta";
+      if(!confirm(`Importare backup del ${ts}?\nSovrascrive TUTTI i dati attuali.`))return;
+      S.clients=d.clients||[];S.events=d.events||[];S.payments=d.payments||[];
+      S.projects=d.projects||[];if(d.settings)S.settings=d.settings;
+      save();render();showMsg("bk-msg","✓ Importato!","#10b981");
+    }catch{showMsg("bk-msg","✗ File non valido","#ef4444");}
+  };r.readAsText(f);inp.value="";
+}
+function resetApp(){
+  if(!confirm("Sei sicuro di voler cancellare TUTTI i dati?\n\nClienti, progetti, pagamenti ed eventi verranno eliminati.\nLe impostazioni verranno mantenute.\n\nQuesta operazione è IRREVERSIBILE."))return;
+  if(!confirm("Ultima conferma: cancellare tutto?"))return;
+  S.clients=[];S.events=[];S.payments=[];S.projects=[];S.openProjects={};
+  save();S.page="dashboard";S.selClient=null;render();
+  alert("Reset completato. L'app è stata svuotata.");
+}
+function showMsg(id,msg,c){const el=document.getElementById(id);if(el){el.textContent=msg;el.style.color=c;setTimeout(()=>{if(el)el.textContent="";},3000);}}
+
+// ─── CLIENT MODAL ─────────────────────────────────────────────────────────────
+function closeModal(){document.getElementById("mo")?.remove();}
+function openClientModal(cid){
+  const ex=cid?S.clients.find(c=>c.id===cid):null;
+  const c=ex||{id:uid(),name:"",email:"",phone:"",service:SERVICES[0],stage:STAGES[0],notes:"",createdAt:today(),updatedAt:today(),archived:false};
+  const ov=document.createElement("div");ov.className="modal-overlay";ov.id="mo";ov.onclick=e=>{if(e.target===ov)closeModal();};
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header"><span class="font-bold">${ex?"Modifica cliente":"Nuovo cliente"}</span><button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome *</label><input id="cf-n" value="${c.name}" placeholder="Es: Elisabetta Bilei"/></div>
+      <div class="field"><label>Email</label><input id="cf-e" type="email" value="${c.email||""}"/></div>
+      <div class="field"><label>Telefono</label><input id="cf-p" value="${c.phone||""}"/></div>
+      <div class="field"><label>Fase</label><select id="cf-st">${STAGES.map(s=>`<option${c.stage===s?" selected":""}>${s}</option>`).join("")}</select></div>
+      <div class="field"><label>Note cliente</label><textarea id="cf-no">${c.notes||""}</textarea></div>
+      <div class="flex gap2 justify-between mt3">
+        <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+        <button class="btn btn-primary" onclick="saveClient('${c.id}','${!!ex}')">Salva cliente</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  setTimeout(()=>document.getElementById("cf-n")?.focus(),50);
+}
+function saveClient(id,isEx){
+  const name=document.getElementById("cf-n")?.value?.trim()||"";
+  if(!name){alert("Inserisci almeno il nome del cliente.");return;}
+  const c={id,name,email:document.getElementById("cf-e")?.value||"",phone:document.getElementById("cf-p")?.value||"",stage:document.getElementById("cf-st")?.value||STAGES[0],notes:document.getElementById("cf-no")?.value||"",updatedAt:today(),archived:false};
+  if(isEx==="true"){const o=S.clients.find(x=>x.id===id);c.createdAt=o?.createdAt||today();c.archived=o?.archived||false;S.clients=S.clients.map(x=>x.id===id?c:x);S.events=[...S.events,{id:uid(),clientId:id,date:today(),text:"Dati cliente aggiornati",type:"edit"}];}
+  else{c.createdAt=today();S.clients=[...S.clients,c];S.events=[...S.events,{id:uid(),clientId:id,date:today(),text:"Cliente creato",type:"create"}];}
+  save();closeModal();render();
+}
+
+// ─── PROJECT MODAL ────────────────────────────────────────────────────────────
+function openProjModal(clientId, projId){
+  const ex=projId?S.projects.find(p=>p.id===projId):null;
+  const p=ex||{id:uid(),clientId,name:"",service:SERVICES[0],stage:"Pianificato",amount:"",startDate:"",endDate:"",notes:"",linkPreventivo:"",linkForm:"",numPuntate:"",prezzoPuntata:"",lunghezzaPuntate:"",distribuzione:"",prezzoDistribuzione:"",sonorizzazione:"",trailer:"no",prezzoTrailer:"",rivalsaINPS:false,marcaBollo:false,archived:false};
+  const ov=document.createElement("div");ov.className="modal-overlay";ov.id="mo";ov.onclick=e=>{if(e.target===ov)closeModal();};
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header"><span class="font-bold">${ex?"Modifica progetto":"Nuovo progetto"}</span><button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome progetto *</label><input id="pj-n" value="${p.name}" placeholder="Es: Podcast Maggio 2026"/></div>
+      <div class="field"><label>Tipo servizio</label>
+        <select id="pj-sv" onchange="onProjServiceChange()">
+          ${SERVICES.map(s=>`<option${p.service===s?" selected":""}>${s}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field"><label>Fase</label><select id="pj-st">${PROJ_STAGES.map(s=>`<option${p.stage===s?" selected":""}>${s}</option>`).join("")}</select></div>
+      <div class="grid2">
+        <div class="field"><label>Data inizio</label><input id="pj-sd" type="date" value="${p.startDate||""}"/></div>
+        <div class="field"><label>Data fine prevista</label><input id="pj-ed" type="date" value="${p.endDate||""}"/></div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:14px 0 14px"></div>
+      <div class="sec-label">🔗 Link documenti</div>
+      <div class="field"><label>Link preventivo</label><input id="pj-lp" type="url" value="${(p.linkPreventivo||'').replace(/"/g,'&quot;')}" placeholder="https://drive.google.com/..."/></div>
+      <div class="field"><label>Link form cliente</label><input id="pj-lf" type="url" value="${(p.linkForm||'').replace(/"/g,'&quot;')}" placeholder="https://forms.google.com/..."/></div>
+
+      <!-- sezione dinamica per servizio -->
+      <div id="pj-service-fields"></div>
+
+      <!-- totale automatico (sempre visibile) -->
+      <div style="border-top:1px solid var(--border);margin:14px 0 14px"></div>
+      <div class="card-sm mb3" style="background:var(--bg)">
+        <div class="sec-label mb2">💰 Prezzo totale</div>
+        <div id="pj-breakdown" class="text-sm muted mb2"></div>
+        <label class="toggle-wrap mb3" style="gap:10px">
+          <input type="checkbox" id="pj-inps" ${p.rivalsaINPS?"checked":""} onchange="calcProjTotal()" style="width:auto;accent-color:var(--accent)"/>
+          <span>Rivalsa INPS 4%</span>
+        </label>
+        <div class="flex justify-between items-center" style="border-top:1px solid var(--border);padding-top:10px">
+          <span class="font-bold">Totale progetto</span>
+          <span class="font-black text-lg" style="color:var(--accent)" id="pj-total">€ 0,00</span>
+        </div>
+      </div>
+
+      <div class="field"><label>Note</label><textarea id="pj-no">${p.notes||""}</textarea></div>
+      <!-- hidden amount updated by calcProjTotal -->
+      <input type="hidden" id="pj-a" value="${p.amount||0}"/>
+      <div class="flex gap2 justify-between mt3">
+        <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+        <button class="btn btn-primary" onclick="saveProj('${p.id}','${clientId}','${!!ex}')">Salva progetto</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  // store existing values for restoring after service switch
+  ov._projData = p;
+  setTimeout(()=>{document.getElementById("pj-n")?.focus();onProjServiceChange();},50);
+}
+
+// Renders the dynamic section based on selected service
+function onProjServiceChange(){
+  const sv=document.getElementById("pj-sv")?.value||"";
+  const area=document.getElementById("pj-service-fields");
+  if(!area)return;
+  // recover saved data from modal
+  const p=document.getElementById("mo")?._projData||{};
+
+  if(sv==="Montaggio Podcast"){
+    area.innerHTML=`
+    <div style="border-top:1px solid var(--border);margin:14px 0 14px"></div>
+    <div class="sec-label">🎙️ Dettagli Montaggio Podcast</div>
+    <div class="grid2">
+      <div class="field"><label>N° puntate</label><input id="pj-np" type="number" value="${p.numPuntate||""}" placeholder="Es: 8" oninput="calcProjTotal()"/></div>
+      <div class="field"><label>Prezzo per puntata (€)</label><input id="pj-pp" type="number" value="${p.prezzoPuntata||""}" placeholder="Es: 150" oninput="calcProjTotal()"/></div>
+    </div>
+    <div class="field"><label>Lunghezza indicativa puntate</label><input id="pj-lun" value="${p.lunghezzaPuntate||""}" placeholder="Es: 30-45 min"/></div>
+    <div class="grid2">
+      <div class="field"><label>Distribuzione</label>
+        <select id="pj-dis">
+          <option value=""${!p.distribuzione?" selected":""}>— non specificato —</option>
+          <option value="si"${p.distribuzione==="si"?" selected":""}>Sì</option>
+          <option value="no"${p.distribuzione==="no"?" selected":""}>No</option>
+        </select>
+      </div>
+      <div class="field"><label>Prezzo distribuzione (€)</label><input id="pj-pdis" type="number" value="${p.prezzoDistribuzione||""}" placeholder="0" oninput="calcProjTotal()"/></div>
+    </div>
+    <div class="field"><label>Tipo di sonorizzazione</label><input id="pj-son" value="${p.sonorizzazione||""}" placeholder="Es: musica stock, jingle custom, sound design..."/></div>
+    <div class="grid2">
+      <div class="field"><label>Trailer</label>
+        <select id="pj-tr" onchange="calcProjTotal()">
+          <option value="no"${(p.trailer||"no")==="no"?" selected":""}>No</option>
+          <option value="si"${p.trailer==="si"?" selected":""}>Sì</option>
+        </select>
+      </div>
+      <div class="field"><label>Prezzo trailer (€)</label><input id="pj-ptr" type="number" value="${p.prezzoTrailer||""}" placeholder="0" oninput="calcProjTotal()"/></div>
+    </div>`;
+  } else {
+    // Podcasting Flow / Consulenza / Altro — solo prezzo libero
+    const label = sv==="Podcasting Flow"?"🎧 Podcasting Flow": sv==="Consulenza"?"💬 Consulenza":"📦 Altro";
+    area.innerHTML=`
+    <div style="border-top:1px solid var(--border);margin:14px 0 14px"></div>
+    <div class="sec-label">${label}</div>
+    <div class="field"><label>Prezzo (€)</label>
+      <input id="pj-free-price" type="number" value="${p.amount||""}" placeholder="0" oninput="calcProjTotal()"/>
+    </div>`;
+  }
+  calcProjTotal();
+}
+
+function toggleTimeline(){
+  const body=document.getElementById("tl-body");
+  const chev=document.getElementById("tl-chev");
+  if(!body)return;
+  const open=body.style.display==="none";
+  body.style.display=open?"block":"none";
+  if(chev)chev.style.transform=open?"rotate(90deg)":"";
+}
+function toggleArchProjList(){
+  const list=document.getElementById("arch-proj-list");
+  const chev=document.getElementById("arch-chev");
+  if(!list)return;
+  const open=list.style.display==="none";
+  list.style.display=open?"block":"none";
+  if(chev) chev.style.transform=open?"rotate(90deg)":"";
+}
+
+function calcProjTotal(){
+  const sv=document.getElementById("pj-sv")?.value||"";
+  const inps=document.getElementById("pj-inps")?.checked||false;
+  let subtotal=0;
+  let rows=[];
+
+  if(sv==="Montaggio Podcast"){
+    const np=Number(document.getElementById("pj-np")?.value||0);
+    const pp=Number(document.getElementById("pj-pp")?.value||0);
+    const trailer=document.getElementById("pj-tr")?.value==="si";
+    const ptr=trailer?Number(document.getElementById("pj-ptr")?.value||0):0;
+    const pdis=Number(document.getElementById("pj-pdis")?.value||0);
+    const basePuntate=np*pp;
+    subtotal=basePuntate+ptr+pdis;
+    if(np&&pp) rows.push(`${np} puntate × ${fmt(pp)} = <strong>${fmt(basePuntate)}</strong>`);
+    if(ptr>0)  rows.push(`Trailer: <strong>${fmt(ptr)}</strong>`);
+    if(pdis>0) rows.push(`Distribuzione: <strong>${fmt(pdis)}</strong>`);
+  } else {
+    const fp=Number(document.getElementById("pj-free-price")?.value||0);
+    subtotal=fp;
+    if(fp>0) rows.push(`Prezzo base: <strong>${fmt(fp)}</strong>`);
+  }
+
+  const inpsAmt=inps?subtotal*0.04:0;
+  subtotal+=inpsAmt;
+  if(inpsAmt>0) rows.push(`Rivalsa INPS 4%: <strong>${fmt(inpsAmt)}</strong>`);
+  const total=subtotal;
+
+  const bd=document.getElementById("pj-breakdown");
+  if(bd) bd.innerHTML=rows.length?rows.join("<br/>"):`<span style="color:var(--muted)">Compila i campi per vedere il calcolo</span>`;
+  const te=document.getElementById("pj-total");
+  if(te) te.textContent=fmt(total);
+  const ae=document.getElementById("pj-a");
+  if(ae&&total>0) ae.value=total.toFixed(2);
+}
+function saveProj(pid,clientId,isEx){
+  const name=document.getElementById("pj-n")?.value?.trim()||"";
+  if(!name){alert("Inserisci il nome del progetto.");return;}
+  const sv=document.getElementById("pj-sv")?.value||SERVICES[0];
+  const isMontaggio=sv==="Montaggio Podcast";
+  const p={
+    id:pid,clientId,name,
+    service:sv,
+    stage:document.getElementById("pj-st")?.value||"Pianificato",
+    amount:Number(document.getElementById("pj-a")?.value)||0,
+    startDate:document.getElementById("pj-sd")?.value||"",
+    endDate:document.getElementById("pj-ed")?.value||"",
+    notes:document.getElementById("pj-no")?.value||"",
+    linkPreventivo:document.getElementById("pj-lp")?.value||"",
+    linkForm:document.getElementById("pj-lf")?.value||"",
+    // montaggio-only fields
+    numPuntate:isMontaggio?document.getElementById("pj-np")?.value||"":"",
+    prezzoPuntata:isMontaggio?document.getElementById("pj-pp")?.value||"":"",
+    lunghezzaPuntate:isMontaggio?document.getElementById("pj-lun")?.value||"":"",
+    distribuzione:isMontaggio?document.getElementById("pj-dis")?.value||"":"",
+    prezzoDistribuzione:isMontaggio?document.getElementById("pj-pdis")?.value||"":"",
+    sonorizzazione:isMontaggio?document.getElementById("pj-son")?.value||"":"",
+    trailer:isMontaggio?document.getElementById("pj-tr")?.value||"no":"no",
+    prezzoTrailer:isMontaggio?document.getElementById("pj-ptr")?.value||"":"",
+    rivalsaINPS:document.getElementById("pj-inps")?.checked||false,
+    marcaBollo:document.getElementById("pj-bollo")?.checked||false,
+    archived:false
+  };
+  if(isEx==="true"){
+    S.projects=S.projects.map(x=>x.id===pid?p:x);
+    S.events=[...S.events,{id:uid(),clientId,date:today(),text:`Progetto "${name}" aggiornato`,type:"edit"}];
+  } else {
+    S.projects=[...S.projects,p];
+    S.events=[...S.events,{id:uid(),clientId,date:today(),text:`Progetto creato: "${name}"`,type:"create"}];
+    S.openProjects[pid]=true;
+  }
+  S.clients=S.clients.map(c=>c.id===clientId?{...c,updatedAt:today()}:c);
+  S.selClient=S.clients.find(c=>c.id===clientId);
+  save();closeModal();render();
+}
+
+// ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
+// _pcs = array of {id, name, value} — free rows
+let _puc=false, _pcs=[], _pcsMode="eur";
+
+function openPayModal(preClientId, preProjectId, editPayId){
+  const existing=editPayId?S.payments.find(p=>p.id===editPayId):null;
+  _puc=!!(existing?.customSplits);
+  _pcsMode=existing?.customSplitsMode||"eur";
+  // restore saved rows or start empty
+  if(existing?.customSplits){
+    _pcs=Object.entries(existing.customSplits).map(([name,value])=>({id:uid(),name,value:Number(value)}));
+  } else {
+    _pcs=[];
+  }
+
+  const ac=S.clients.filter(c=>!c.archived);
+  if(!ac.length){alert("Nessun cliente attivo.");return;}
+  const effClientId=existing?.clientId||preClientId||ac[0]?.id;
+  const effProjectId=existing?.projectId||preProjectId||null;
+
+  function projOpts(cid){
+    const ps=S.projects.filter(p=>p.clientId===cid&&!p.archived);
+    if(!ps.length)return`<option value="">— nessun progetto —</option>`;
+    return`<option value="">— nessun progetto specifico —</option>`+
+      ps.map(p=>`<option value="${p.id}"${p.id===effProjectId?" selected":""}>${p.name}</option>`).join("");
+  }
+
+  const ov=document.createElement("div");ov.className="modal-overlay";ov.id="mo";
+  ov.onclick=e=>{if(e.target===ov)closeModal();};
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header">
+      <span class="font-bold">${existing?"Modifica pagamento":"Registra pagamento"}</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Cliente</label>
+        <select id="pf-cl" onchange="updateProjSelect()">${ac.map(c=>`<option value="${c.id}"${c.id===effClientId?" selected":""}>${c.name}</option>`).join("")}</select>
+      </div>
+      <div class="field"><label>Progetto (opzionale)</label>
+        <select id="pf-pr">${projOpts(effClientId)}</select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Importo (€)</label>
+          <input id="pf-a" type="number" placeholder="0" value="${existing?.amountBase||""}" oninput="onPayChange()"/>
+        </div>
+        <div class="field"><label>Data</label>
+          <input id="pf-d" type="date" value="${existing?.date||today()}"/>
+        </div>
+      </div>
+      <div class="field"><label>Stato pagamento</label>
+        <select id="pf-status" onchange="onPayChange()">
+          ${PAY_STATUS.map(s=>`<option value="${s}"${(existing?.status||"Pagato")===s?" selected":""}>${s}</option>`).join("")}
+        </select>
+      </div>
+      <!-- mini calculator -->
+      <div class="card-sm mb3" style="background:var(--bg)">
+        <div class="sec-label mb2">🧮 Calcolatrice rapida</div>
+        <div class="flex gap2 mb2">
+          <input id="calc-display" type="text" value="0" readonly style="flex:1;text-align:right;font-size:18px;font-weight:700;color:var(--accent);background:var(--surface)"/>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+          ${["7","8","9","÷","4","5","6","×","1","2","3","−","0",".","=","+"].map(k=>`
+            <button type="button" onclick="calcKey('${k}')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0;
+              ${["÷","×","−","+"].includes(k)?"color:var(--accent)":""}
+              ${"=" === k?"background:var(--accent);color:#fff;border-color:var(--accent)":""}
+            ">${k}</button>`).join("")}
+          <button type="button" onclick="calcKey('C')" class="btn btn-danger btn-sm" style="justify-content:center;font-size:13px;font-weight:700;grid-column:1/3">C</button>
+          <button type="button" onclick="calcKey('→AMT')" class="btn btn-green btn-sm" style="justify-content:center;font-size:11px;font-weight:700;grid-column:3/5">→ Importo</button>
+        </div>
+      </div>
+      <div class="field"><label>Nota</label>
+        <input id="pf-no" placeholder="Es: acconto 50%, saldo finale..." value="${existing?.note||""}"/>
+      </div>
+      <label class="toggle-wrap mb3" style="gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px">
+        <input type="checkbox" id="pf-bollo" ${existing?.marcaBollo?"checked":""} onchange="onPayChange()" style="width:auto;accent-color:var(--accent)"/>
+        <div>
+          <div class="font-bold text-sm">Marca da bollo €2,00</div>
+          <div class="text-xs muted">Verrà aggiunta all'importo incassato</div>
+        </div>
+      </label>
+      <div class="card-sm mb3" style="background:var(--bg)">
+        <label class="toggle-wrap mb2" onclick="togglePayCustom()">
+          <div class="toggle${_puc?" on":""}" id="pay-tog"></div>
+          <div><div class="font-bold text-sm">Ripartizione personalizzata</div>
+          <div class="text-xs muted">Off = % default · On = voci libere</div></div>
+        </label>
+        <div id="pcs-mode-row" style="display:${_puc?"flex":"none"};gap:8px;margin-top:8px">
+          <button id="pcs-btn-pct" class="btn btn-sm ${_pcsMode==="pct"?"btn-primary":"btn-ghost"}" onclick="setPcsMode('pct')">% Percentuale</button>
+          <button id="pcs-btn-eur" class="btn btn-sm ${_pcsMode==="eur"?"btn-primary":"btn-ghost"}" onclick="setPcsMode('eur')">€ Importo fisso</button>
+        </div>
+      </div>
+      <div id="pay-split-area"></div>
+      <div class="flex gap2 justify-between mt3">
+        <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+        <button class="btn btn-primary" onclick="savePay('${existing?.id||""}')">
+          ${existing?"Salva modifiche":"Registra pagamento"}
+        </button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  onPayChange();
+}
+
+function setPcsMode(mode){
+  _pcsMode=mode;
+  _pcs=[];
+  const bp=document.getElementById("pcs-btn-pct");
+  const be=document.getElementById("pcs-btn-eur");
+  if(bp) bp.className=`btn btn-sm ${mode==="pct"?"btn-primary":"btn-ghost"}`;
+  if(be) be.className=`btn btn-sm ${mode==="eur"?"btn-primary":"btn-ghost"}`;
+  onPayChange();
+}
+
+function updateProjSelect(){
+  const cid=document.getElementById("pf-cl")?.value;
+  const sel=document.getElementById("pf-pr");if(!sel)return;
+  const ps=S.projects.filter(p=>p.clientId===cid&&!p.archived);
+  sel.innerHTML=`<option value="">— nessun progetto specifico —</option>`+
+    ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+}
+
+function togglePayCustom(){
+  _puc=!_puc;
+  if(!_puc) _pcs=[];
+  const t=document.getElementById("pay-tog");if(t) t.className="toggle"+(_puc?" on":"");
+  const mr=document.getElementById("pcs-mode-row");if(mr) mr.style.display=_puc?"flex":"none";
+  onPayChange();
+}
+
+let _calcVal="0",_calcOp=null,_calcPrev=null;
+function calcKey(k){
+  const d=document.getElementById("calc-display");if(!d)return;
+  if(k==="C"){_calcVal="0";_calcOp=null;_calcPrev=null;}
+  else if(k==="→AMT"){
+    const ai=document.getElementById("pf-a");
+    if(ai){ai.value=parseFloat(_calcVal)||0;onPayChange();}
+    return;
+  }
+  else if(["+","−","×","÷"].includes(k)){
+    _calcPrev=parseFloat(_calcVal)||0;_calcOp=k;_calcVal="0";
+  }
+  else if(k==="="){
+    if(_calcOp&&_calcPrev!==null){
+      const b=parseFloat(_calcVal)||0;
+      if(k==="="){
+        let r=_calcPrev;
+        if(_calcOp==="+")r=_calcPrev+b;
+        else if(_calcOp==="−")r=_calcPrev-b;
+        else if(_calcOp==="×")r=_calcPrev*b;
+        else if(_calcOp==="÷")r=b!==0?_calcPrev/b:0;
+        _calcVal=String(Math.round(r*100)/100);
+        _calcOp=null;_calcPrev=null;
+      }
+    }
+  }
+  else if(k==="."){
+    if(!_calcVal.includes("."))_calcVal+=".";
+  }
+  else{
+    _calcVal=(_calcVal==="0"||_calcOp)?k:_calcVal+k;
+  }
+  if(d)d.value=_calcVal;
+}
+window._cinqOn=false;
+function toggleCinq(){
+  window._cinqOn=!window._cinqOn;
+  const t=document.getElementById("cinq-tog");
+  if(t)t.className="toggle"+(window._cinqOn?" on":"");
+  onPayChange();
+}
+function addSplitRow(){
+  _pcs.push({id:uid(),name:"",value:0});
+  onPayChange();
+}
+function removeSplitRow(rowId){
+  _pcs=_pcs.filter(r=>r.id!==rowId);
+  onPayChange();
+}
+function setSplitName(rowId,val){
+  const r=_pcs.find(r=>r.id===rowId);if(r) r.name=val;
+}
+function setSplitVal(rowId,val){
+  const r=_pcs.find(r=>r.id===rowId);if(r) r.value=Math.max(0,Number(val)||0);
+  onPayChange();
+}
+function stepSplitVal(rowId,delta){
+  const r=_pcs.find(r=>r.id===rowId);if(!r)return;
+  if(_pcsMode==="pct") r.value=Math.max(0,Math.min(100,(r.value||0)+delta));
+  else r.value=Math.max(0,(r.value||0)+delta);
+  onPayChange();
+}
+
+function onPayChange(){
+  const amt=Number(document.getElementById("pf-a")?.value||0);
+  const bollo=document.getElementById("pf-bollo")?.checked||false;
+  const status=document.getElementById("pf-status")?.value||"Pagato";
+  const totalAmt=amt+(bollo?2:0);
+  const area=document.getElementById("pay-split-area");if(!area)return;
+  if(!amt){area.innerHTML="";return;}
+  const isPaid=status==="Pagato";
+  const splitLabel=isPaid?"Ripartizione effettiva":"Ripartizione pianificata";
+  const totalLabel=isPaid?"Totale incassato":"Totale previsto";
+  const totalColor=isPaid?"var(--green)":"var(--yellow)";
+  if(!_puc){
+    area.innerHTML=`<div class="card-sm mb3" style="background:var(--bg)">
+      <div class="sec-label">${splitLabel} — default</div>
+      ${Object.entries(S.settings.splits).map(([k,v])=>`
+        <div class="split-row"><span class="muted">${k} (${v}%)</span><span class="font-bold">${fmt(amt*v/100)}</span></div>`).join("")}
+      ${bollo?`<div class="split-row"><span class="muted">Marca da bollo</span><span class="font-bold">+ ${fmt(2)}</span></div>`:""}
+      <div class="split-row" style="border-top:1px solid var(--border);padding-top:6px">
+        <span class="font-bold">${totalLabel}</span><span class="font-black" style="color:${totalColor}">${fmt(totalAmt)}</span>
+      </div>
+    </div>`;
+  } else {
+    const unit=_pcsMode==="pct"?"%":"€";
+    const step=_pcsMode==="pct"?5:10;
+    const totAssigned=_pcs.reduce((s,r)=>s+Number(r.value||0),0);
+    const diff=_pcsMode==="eur"?(amt-totAssigned):null;
+    const pctOk=_pcsMode==="pct"&&Math.abs(totAssigned-100)<0.01;
+    const eurOk=_pcsMode==="eur"&&Math.abs(diff)<0.01;
+    const statusColor=(pctOk||eurOk)?"#10b981":"#ef4444";
+    // cinquina rounding switch
+    const cinqId="cinq-switch-"+Math.random().toString(36).slice(2);
+    const cinqOn=window._cinqOn||false;
+    const cinqSwitch=`<label class="toggle-wrap mb3" style="gap:8px;cursor:pointer" onclick="toggleCinq()">
+      <div class="toggle${cinqOn?' on':''}" id="cinq-tog" style="flex-shrink:0"></div>
+      <div class="text-sm"><strong>Arrotonda alla cinquina</strong><br/><span class="muted" style="font-size:11px">Gli esuberi di ogni voce vanno all'ultima</span></div>
+    </label>`;
+
+    let displayPcs=[..._pcs];
+    if(cinqOn&&_pcsMode==="pct"&&amt>0){
+      // round each row down to nearest 5€, collect remainders, add to last
+      let remainder=0;
+      displayPcs=_pcs.map((r,i)=>{
+        const raw=amt*r.value/100;
+        const rounded=Math.floor(raw/5)*5;
+        remainder+=raw-rounded;
+        if(i===_pcs.length-1){
+          return{...r,_display:rounded+remainder};
+        }
+        return{...r,_display:rounded};
+      });
+    }
+
+    const rows=displayPcs.map(r=>`
+      <div class="flex items-center gap2 mb2">
+        <input type="text" value="${r.name.replace(/"/g,'&quot;')}" placeholder="Nome voce..."
+          style="flex:1;font-size:12px;min-width:0;padding:6px 8px"
+          onchange="setSplitName('${r.id}',this.value)"/>
+        <div class="stepper">
+          <button class="stepper-btn" type="button" onclick="stepSplitVal('${r.id}',-${step})">−</button>
+          <input type="number" value="${_pcsMode==="pct"?(+r.value).toFixed(1):(+r.value).toFixed(2)}"
+            style="width:${_pcsMode==="pct"?"64":"82"}px;text-align:center"
+            oninput="setSplitVal('${r.id}',this.value)"/>
+          <button class="stepper-btn" type="button" onclick="stepSplitVal('${r.id}',${step})">+</button>
+        </div>
+        <span class="muted text-xs" style="width:16px">${unit}</span>
+        ${_pcsMode==="pct"?`<span class="text-xs accent" style="width:52px;text-align:right">${fmt(r._display!==undefined?r._display:amt*r.value/100)}</span>`:""}
+        <button class="stepper-btn" type="button" onclick="removeSplitRow('${r.id}')" style="color:#ef4444">✕</button>
+      </div>`).join("");
+    area.innerHTML=`<div class="card-sm mb3" style="background:var(--bg)">
+      <div class="sec-label">${splitLabel} — ${unit} personalizzata</div>
+      ${_pcsMode==="pct"?cinqSwitch:""}
+      ${rows}
+      <button class="btn btn-ghost btn-sm mt2 mb3" onclick="addSplitRow()" type="button">+ Aggiungi voce</button>
+      <div class="split-row" style="border-top:1px solid var(--border);padding-top:8px">
+        ${_pcsMode==="pct"
+          ?`<span class="font-bold">Totale %</span><span class="font-bold" style="color:${statusColor}">${totAssigned.toFixed(1)}%</span>`
+          :`<span class="font-bold">Non assegnato</span><span class="font-bold" style="color:${statusColor}">${fmt(diff)}</span>`
+        }
+      </div>
+      ${bollo?`<div class="split-row"><span class="muted">Marca da bollo</span><span class="font-bold">+ ${fmt(2)}</span></div>`:""}
+      <div class="split-row"><span class="font-bold">${totalLabel}</span><span class="font-black" style="color:${totalColor}">${fmt(totalAmt)}</span></div>
+    </div>`;
+  }
+}
+function addSplitRow(){_pcs.push({id:uid(),name:"",value:0});onPayChange();}
+function removeSplitRow(rowId){_pcs=_pcs.filter(r=>r.id!==rowId);onPayChange();}
+function setSplitName(rowId,val){const r=_pcs.find(r=>r.id===rowId);if(r)r.name=val;}
+function setSplitVal(rowId,val){const r=_pcs.find(r=>r.id===rowId);if(r)r.value=Math.max(0,Number(val)||0);onPayChange();}
+function stepSplitVal(rowId,delta){
+  const r=_pcs.find(r=>r.id===rowId);if(!r)return;
+  if(_pcsMode==="pct")r.value=Math.max(0,Math.min(100,(r.value||0)+delta));
+  else r.value=Math.max(0,(r.value||0)+delta);
+  onPayChange();
+}
+function stepCS(){}function setCS(){}function stepCSPct(){}function setCSPct(){}
+
+function savePay(editId){
+  const amt=Number(document.getElementById("pf-a")?.value||0);
+  const bollo=document.getElementById("pf-bollo")?.checked||false;
+  const status=document.getElementById("pf-status")?.value||"Pagato";
+  const totalAmt=amt+(bollo?2:0);
+  const cid=document.getElementById("pf-cl")?.value;
+  const projId=document.getElementById("pf-pr")?.value||null;
+  const date=document.getElementById("pf-d")?.value||today();
+  const note=document.getElementById("pf-no")?.value||"";
+  if(!amt||!cid){alert("Inserisci cliente e importo.");return;}
+
+  const pay={
+    id:editId||uid(), clientId:cid, projectId:projId||null,
+    amount:totalAmt, amountBase:amt, marcaBollo:bollo,
+    status, date, note
+  };
+  if(_puc&&_pcs.length>0){
+    // convert array of {id,name,value} to {name:value} object
+    pay.customSplits=Object.fromEntries(_pcs.filter(r=>r.name).map(r=>[r.name,r.value]));
+    pay.customSplitsMode=_pcsMode;
+  }
+
+  if(editId){
+    S.payments=S.payments.map(p=>p.id===editId?pay:p);
+  } else {
+    S.payments=[...S.payments,pay];
+  }
+
+  S.clients=S.clients.map(c=>c.id===cid?{...c,updatedAt:today()}:c);
+  const proj=projId?S.projects.find(p=>p.id===projId):null;
+  const bolloNote=bollo?" +€2 bollo":"";
+  const evtText=editId
+    ?`Pagamento modificato: ${fmt(totalAmt)}${bolloNote} [${status}]${proj?` · ${proj.name}`:""}`
+    :`Pagamento ${fmt(totalAmt)}${bolloNote} [${status}]${proj?` · ${proj.name}`:""} ${note?"· "+note:""}`;
+  S.events=[...S.events,{id:uid(),clientId:cid,date,text:evtText,type:"payment"}];
+  save();closeModal();
+  if(S.selClient?.id===cid)S.selClient=S.clients.find(c=>c.id===cid);
+  render();
+}
+
+
+// ─── SERVICE WORKER ───────────────────────────────────────────────────────────
+if("serviceWorker" in navigator){
+  const sw=`const C="niky-crm-v3",F=["./","./index.html","./manifest.json","./icon-192.png","./icon-512.png"];
+self.addEventListener("install",e=>e.waitUntil(caches.open(C).then(c=>c.addAll(F))));
+self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;
+  navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:"application/javascript"}))).catch(()=>{});
+}
+render();
+</script>
+</body>
+</html>
