@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Niky CRM</title>
+<link rel="manifest" href="./manifest.json"/>
+<link rel="apple-touch-icon" href="./icon-192.png"/>
+<link rel="icon" type="image/png" href="./icon-192.png"/>
+<meta name="theme-color" content="#6366f1"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@700;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--border:#2a2d3a;
+  --text:#e8ecf4;--muted:#6b7280;--accent:#6366f1;
+  --green:#10b981;--yellow:#f59e0b;--red:#ef4444;--gray:#64748b;
+}
+.light{
+  --bg:#f4f6fb;--surface:#ffffff;--border:#e2e8f0;
+  --text:#1a1d27;--muted:#64748b;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;border:none;background:none;font-family:inherit;color:inherit}
+input,select,textarea{font-family:inherit;outline:none;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:14px;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical}
+
+/* LAYOUT */
+#app{display:flex;flex-direction:column;min-height:100dvh}
+header{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:8px;font-family:'Space Grotesk',sans-serif;font-weight:900;font-size:16px}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.header-right{display:flex;align-items:center;gap:8px}
+.nav-desktop{display:flex;gap:4px}
+@media(max-width:600px){.nav-desktop{display:none}}
+.nav-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;transition:.15s}
+.nav-btn.active{background:var(--accent);color:#fff}
+.nav-btn:not(.active){color:var(--muted)}
+.nav-btn:not(.active):hover{background:var(--border)}
+main{flex:1;max-width:900px;width:100%;margin:0 auto;padding:20px 16px 90px}
+@media(min-width:600px){main{padding-bottom:24px}}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:40}
+@media(min-width:600px){.bottom-nav{display:none}}
+.bottom-btn{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px;font-size:11px;font-weight:600;color:var(--muted);transition:.15s}
+.bottom-btn.active{color:var(--accent)}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px}
+.card-sm{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+
+/* GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+@media(max-width:600px){.grid3{grid-template-columns:1fr 1fr}.grid5{grid-template-columns:1fr 1fr}}
+
+/* BTNS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;transition:.15s;cursor:pointer}
+.btn:hover{opacity:.85}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-danger{background:#ef444420;border:1px solid #ef444440;color:#ef4444}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:20px;font-size:11px;font-weight:700;padding:2px 8px;white-space:nowrap}
+.badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.5)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-body{padding:20px;overflow-y:auto;max-height:75vh}
+
+/* FORM */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+
+/* LIST ITEMS */
+.client-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:.15s}
+.client-row:hover{border-color:var(--accent);transform:translateY(-1px)}
+.client-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0}
+
+/* TIMELINE */
+.tl-item{display:flex;gap:12px;align-items:flex-start}
+.tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+
+/* PIPELINE */
+.pipeline-col{border-radius:12px;padding:12px;text-align:center}
+
+/* TABS / FILTERS */
+.pill{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap}
+.pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pill:hover:not(.active){border-color:var(--accent);color:var(--accent)}
+
+/* UTILS */
+.flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.gap1{gap:4px}.gap2{gap:8px}.gap3{gap:12px}.gap4{gap:16px}
+.mt1{margin-top:4px}.mt2{margin-top:8px}.mt3{margin-top:12px}.mt4{margin-top:16px}.mt5{margin-top:20px}
+.mb1{margin-bottom:4px}.mb2{margin-bottom:8px}.mb3{margin-bottom:12px}
+.space-y-2>*+*{margin-top:8px}.space-y-3>*+*{margin-top:12px}.space-y-4>*+*{margin-top:16px}
+.text-xs{font-size:11px}.text-sm{font-size:13px}.text-base{font-size:15px}.text-lg{font-size:18px}.text-xl{font-size:22px}.text-2xl{font-size:26px}.text-3xl{font-size:32px}
+.font-bold{font-weight:700}.font-black{font-weight:900}.font-semi{font-weight:600}
+.muted{color:var(--muted)}.accent{color:var(--accent)}.green{color:var(--green)}.yellow{color:var(--yellow)}.red{color:var(--red)}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.w-full{width:100%}.hidden{display:none}
+.upper{text-transform:uppercase;letter-spacing:.06em}
+.divider{border:none;border-top:1px solid var(--border);margin:12px 0}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const STAGES = ["Da contattare","Preventivo inviato","In attesa","In lavorazione","Completato"];
+const STAGE_COLORS = {"Da contattare":"#6366f1","Preventivo inviato":"#f59e0b","In attesa":"#ef4444","In lavorazione":"#10b981","Completato":"#64748b"};
+const SERVICES = ["Podcast Editing","Podcast Coaching","Sound Design","Altro"];
+const PAY_STATES = ["Non pagato","Acconto","Pagato"];
+const PAY_COLORS = {"Non pagato":"#ef4444","Acconto":"#f59e0b","Pagato":"#10b981"};
+
+// ─── STORAGE ─────────────────────────────────────────────────────────────────
+const LS = {
+  get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
+};
+const state = {
+  clients: LS.get("crm_clients",[]),
+  events:  LS.get("crm_events",[]),
+  payments:LS.get("crm_payments",[]),
+  settings:LS.get("crm_settings",{businessName:"Niky CRM",alertDays:7,splits:{Tasse:25,"Fondo emergenza":10,Reinvestimento:15,Disponibile:50}}),
+  dark:    LS.get("crm_dark",true),
+  page:    "dashboard",
+  selectedClient: null,
+};
+function save(){
+  LS.set("crm_clients",state.clients);
+  LS.set("crm_events",state.events);
+  LS.set("crm_payments",state.payments);
+  LS.set("crm_settings",state.settings);
+  LS.set("crm_dark",state.dark);
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+const uid=()=>crypto.randomUUID?.()??Math.random().toString(36).slice(2);
+const today=()=>new Date().toISOString().split("T")[0];
+const fmt=n=>new Intl.NumberFormat("it-IT",{style:"currency",currency:"EUR"}).format(n||0);
+const fmtDate=d=>d?new Date(d).toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"}):"—";
+const daysSince=d=>d?Math.floor((Date.now()-new Date(d).getTime())/86400000):999;
+function stageBadge(stage){
+  const c=STAGE_COLORS[stage]||"#64748b";
+  return `<span class="badge" style="background:${c}20;color:${c};border:1px solid ${c}40"><span class="badge-dot" style="background:${c}"></span>${stage}</span>`;
+}
+function payBadge(ps){
+  const c=PAY_COLORS[ps]||"#64748b";
+  return `<span class="badge" style="background:${c}20;color:${c};border:1px solid ${c}40">${ps}</span>`;
+}
+
+// ─── RENDER ENGINE ────────────────────────────────────────────────────────────
+function render(){
+  document.body.className=state.dark?"":"light";
+  const nav=["dashboard","clients","finance","settings"];
+  const navLabels=["Dashboard","Clienti","Finanze","Impostazioni"];
+  const navIcons={
+    dashboard:`<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>`,
+    clients:`<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+    finance:`<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    settings:`<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`
+  };
+
+  const curPage = state.page==="client" ? "clients" : state.page;
+  const desktopNav = nav.map((n,i)=>`
+    <button class="nav-btn${curPage===n?' active':''}" onclick="goTo('${n}')">
+      ${navIcons[n]}<span>${navLabels[i]}</span>
+    </button>`).join("");
+  const bottomNav = nav.map((n,i)=>`
+    <button class="bottom-btn${curPage===n?' active':''}" onclick="goTo('${n}')">
+      ${navIcons[n]}<span>${navLabels[i]}</span>
+    </button>`).join("");
+
+  let pageHTML="";
+  if(state.page==="dashboard") pageHTML=renderDashboard();
+  else if(state.page==="clients") pageHTML=renderClients();
+  else if(state.page==="client") pageHTML=renderClientDetail();
+  else if(state.page==="finance") pageHTML=renderFinance();
+  else if(state.page==="settings") pageHTML=renderSettings();
+
+  document.getElementById("app").innerHTML=`
+    <div id="app-inner">
+      <header>
+        <div class="logo">
+          <div class="logo-icon"><svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>
+          ${state.settings.businessName||"Niky CRM"}
+        </div>
+        <div class="header-right">
+          <nav class="nav-desktop">${desktopNav}</nav>
+          <button class="btn btn-ghost btn-sm" onclick="toggleDark()">${state.dark?"☀️":"🌙"}</button>
+        </div>
+      </header>
+      <main>${pageHTML}</main>
+      <nav class="bottom-nav">${bottomNav}</nav>
+    </div>`;
+
+  // re-attach after render
+  attachEvents();
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+function goTo(page){
+  state.page=page;
+  state.selectedClient=null;
+  render();
+}
+function openClient(id){
+  state.selectedClient=state.clients.find(c=>c.id===id);
+  state.page="client";
+  render();
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function renderDashboard(){
+  const active=state.clients.filter(c=>!c.archived);
+  const stageCounts=STAGES.reduce((a,s)=>({...a,[s]:active.filter(c=>c.stage===s).length}),{});
+  const incassato=state.payments.reduce((s,p)=>s+Number(p.amount),0);
+  const atteso=active.filter(c=>c.payState!=="Pagato").reduce((s,c)=>s+Number(c.amount||0),0);
+  const potenziale=active.reduce((s,c)=>s+Number(c.amount||0),0);
+  const alerts=active.filter(c=>c.stage!=="Completato"&&daysSince(c.updatedAt)>=state.settings.alertDays);
+
+  const kpi=[
+    {l:"Incassato",v:fmt(incassato),c:"var(--green)"},
+    {l:"Da incassare",v:fmt(atteso),c:"var(--yellow)"},
+    {l:"Potenziale",v:fmt(potenziale),c:"var(--accent)"},
+  ];
+
+  return `
+  <div class="space-y-4">
+    <div class="grid3">
+      ${kpi.map(k=>`
+        <div class="card" style="border-color:${k.c}30">
+          <div class="text-xs upper muted mb2">${k.l}</div>
+          <div class="text-2xl font-black" style="color:${k.c}">${k.v}</div>
+        </div>`).join("")}
+    </div>
+
+    <div class="card">
+      <div class="text-xs upper muted mb3">Pipeline clienti attivi</div>
+      <div class="grid5">
+        ${STAGES.map(s=>`
+          <div class="pipeline-col" style="background:${STAGE_COLORS[s]}18;border:1px solid ${STAGE_COLORS[s]}30">
+            <div class="text-2xl font-black" style="color:${STAGE_COLORS[s]}">${stageCounts[s]||0}</div>
+            <div class="text-xs muted mt1">${s}</div>
+          </div>`).join("")}
+      </div>
+    </div>
+
+    ${alerts.length>0?`
+    <div class="card" style="background:#ef444410;border-color:#ef444430">
+      <div class="flex items-center gap2 mb3">
+        <svg width="18" height="18" fill="none" stroke="#ef4444" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span class="font-bold text-sm" style="color:#ef4444">Follow-up richiesto (${alerts.length})</span>
+      </div>
+      <div class="space-y-2">
+        ${alerts.map(c=>`
+          <div class="flex items-center justify-between card-sm" style="cursor:pointer" onclick="openClient('${c.id}')">
+            <span class="font-bold text-sm">${c.name}</span>
+            <div class="flex items-center gap2">
+              ${stageBadge(c.stage)}
+              <span class="text-xs" style="color:#ef4444">${daysSince(c.updatedAt)}g fa</span>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`:""}
+
+    <div class="flex justify-end">
+      <button class="btn btn-primary" onclick="goTo('clients')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+        Nuovo cliente
+      </button>
+    </div>
+  </div>`;
+}
+
+// ─── CLIENTS ──────────────────────────────────────────────────────────────────
+let _filterStage="Tutti", _search="", _showArchived=false;
+
+function renderClients(){
+  const filtered=state.clients.filter(c=>{
+    if(!_showArchived&&c.archived) return false;
+    if(_showArchived&&!c.archived) return false;
+    if(_filterStage!=="Tutti"&&c.stage!==_filterStage) return false;
+    if(_search&&!c.name.toLowerCase().includes(_search.toLowerCase())&&!(c.email||"").toLowerCase().includes(_search.toLowerCase())) return false;
+    return true;
+  });
+
+  return `
+  <div class="space-y-3">
+    <div class="flex gap2" style="flex-wrap:wrap">
+      ${["Tutti",...STAGES].map(s=>`<button class="pill${_filterStage===s?' active':''}" onclick="setFilter('${s}')">${s}</button>`).join("")}
+    </div>
+    <div class="flex gap2 justify-between" style="flex-wrap:wrap">
+      <input type="search" placeholder="🔍 Cerca cliente..." value="${_search}" oninput="setSearch(this.value)" style="max-width:220px"/>
+      <div class="flex gap2">
+        <button class="btn btn-ghost btn-sm" onclick="toggleArchived()">${_showArchived?"← Attivi":"Archiviati"}</button>
+        <button class="btn btn-primary btn-sm" onclick="openModal('client-form',null)">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg> Nuovo
+        </button>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      ${filtered.length===0?`<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Nessun cliente trovato.</div>`:""}
+      ${filtered.map(c=>`
+        <div class="client-row" onclick="openClient('${c.id}')">
+          <div class="flex items-center gap3" style="min-width:0">
+            <div class="client-avatar" style="background:${STAGE_COLORS[c.stage]}20;color:${STAGE_COLORS[c.stage]}">${c.name.charAt(0).toUpperCase()}</div>
+            <div style="min-width:0">
+              <div class="font-bold text-sm truncate">${c.name}</div>
+              <div class="text-xs muted truncate">${c.service||""} · ${c.email||""}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap2" style="flex-shrink:0">
+            ${stageBadge(c.stage)}
+            ${c.amount?`<span class="font-bold text-sm">${fmt(c.amount)}</span>`:""}
+            ${payBadge(c.payState)}
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openModal('client-form','${c.id}')">✏️</button>
+            ${!c.archived?`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();archiveClient('${c.id}')">📦</button>`:""}
+          </div>
+        </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function setFilter(s){_filterStage=s;render()}
+function setSearch(v){_search=v;render()}
+function toggleArchived(){_showArchived=!_showArchived;render()}
+function archiveClient(id){
+  state.clients=state.clients.map(c=>c.id===id?{...c,archived:true,updatedAt:today()}:c);
+  save();render();
+}
+
+// ─── CLIENT DETAIL ────────────────────────────────────────────────────────────
+function renderClientDetail(){
+  const c=state.clients.find(x=>x.id===state.selectedClient?.id)||state.selectedClient;
+  if(!c) return `<button class="btn btn-ghost" onclick="goTo('clients')">← Torna ai clienti</button>`;
+  const evts=state.events.filter(e=>e.clientId===c.id).sort((a,b)=>b.date.localeCompare(a.date));
+  const evtIcon={create:"➕",edit:"✏️",note:"📝",stage:"🔄",payment:"💰"};
+
+  return `
+  <div class="space-y-4">
+    <div class="flex items-center gap3">
+      <button class="btn btn-ghost btn-sm" onclick="goTo('clients')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="client-avatar" style="background:${STAGE_COLORS[c.stage]}20;color:${STAGE_COLORS[c.stage]};width:44px;height:44px;font-size:18px">${c.name.charAt(0).toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div class="text-xl font-black truncate">${c.name}</div>
+        <div class="flex gap2 mt1" style="flex-wrap:wrap">${stageBadge(c.stage)} ${payBadge(c.payState)} <span class="text-xs muted">${c.service||""}</span></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openModal('client-form','${c.id}')">✏️ Modifica</button>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="text-xs upper muted mb3">Contatti</div>
+        ${c.email?`<div class="text-sm mb1">✉️ ${c.email}</div>`:""}
+        ${c.phone?`<div class="text-sm mb1">📞 ${c.phone}</div>`:""}
+        <div class="text-xs muted mt2">Cliente dal ${fmtDate(c.createdAt)}</div>
+      </div>
+      <div class="card">
+        <div class="text-xs upper muted mb3">Economico</div>
+        <div class="text-3xl font-black accent">${fmt(c.amount)}</div>
+        <div class="mt2">${payBadge(c.payState)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="text-xs upper muted mb3">Fase pipeline</div>
+      <div class="flex gap2" style="flex-wrap:wrap">
+        ${STAGES.map(s=>`
+          <button class="pill${c.stage===s?' active':''}" 
+            style="${c.stage===s?`background:${STAGE_COLORS[s]};border-color:${STAGE_COLORS[s]};color:#fff`:''}"
+            onclick="changeStage('${c.id}','${s}')">${s}</button>`).join("")}
+      </div>
+    </div>
+
+    ${c.notes?`
+    <div class="card">
+      <div class="text-xs upper muted mb2">Note</div>
+      <div class="text-sm" style="white-space:pre-wrap">${c.notes}</div>
+    </div>`:""}
+
+    <div class="card">
+      <div class="text-xs upper muted mb3">Timeline</div>
+      <div class="flex gap2 mb3">
+        <input id="new-note-input" type="text" placeholder="Aggiungi nota o aggiornamento..." style="flex:1" onkeydown="if(event.key==='Enter')addNote('${c.id}')"/>
+        <button class="btn btn-primary btn-sm" onclick="addNote('${c.id}')">Aggiungi</button>
+      </div>
+      <div class="space-y-3">
+        ${evts.length===0?`<div class="text-xs muted">Nessun evento ancora.</div>`:""}
+        ${evts.map(ev=>`
+          <div class="tl-item">
+            <div class="tl-dot" style="background:${ev.type==="payment"?"#10b98120":ev.type==="stage"?"#6366f120":"#64748b20"}">${evtIcon[ev.type]||"📝"}</div>
+            <div>
+              <div class="text-sm">${ev.text}</div>
+              <div class="text-xs muted mt1">${fmtDate(ev.date)}</div>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+function changeStage(clientId, stage){
+  state.clients=state.clients.map(c=>c.id===clientId?{...c,stage,updatedAt:today()}:c);
+  state.events=[...state.events,{id:uid(),clientId,date:today(),text:`Fase → ${stage}`,type:"stage"}];
+  state.selectedClient=state.clients.find(c=>c.id===clientId);
+  save();render();
+}
+function addNote(clientId){
+  const inp=document.getElementById("new-note-input");
+  if(!inp||!inp.value.trim()) return;
+  state.events=[...state.events,{id:uid(),clientId,date:today(),text:inp.value.trim(),type:"note"}];
+  state.clients=state.clients.map(c=>c.id===clientId?{...c,updatedAt:today()}:c);
+  state.selectedClient=state.clients.find(c=>c.id===clientId);
+  save();render();
+}
+
+// ─── FINANCE ──────────────────────────────────────────────────────────────────
+let _financeView="mensile";
+function renderFinance(){
+  const total=state.payments.reduce((s,p)=>s+p.amount,0);
+  const byMonth=state.payments.reduce((acc,p)=>{const k=p.date?.slice(0,7)||"N/A";if(!acc[k])acc[k]=[];acc[k].push(p);return acc},{});
+  const byYear=state.payments.reduce((acc,p)=>{const y=p.date?.slice(0,4)||"N/A";acc[y]=(acc[y]||0)+p.amount;return acc},{});
+
+  return `
+  <div class="space-y-4">
+    <div class="grid3">
+      <div class="card" style="border-color:var(--green)30">
+        <div class="text-xs upper muted mb1">Totale incassato</div>
+        <div class="text-3xl font-black green">${fmt(total)}</div>
+      </div>
+      ${Object.entries(state.settings.splits).map(([k,v])=>`
+        <div class="card">
+          <div class="text-xs upper muted mb1">${k} (${v}%)</div>
+          <div class="text-xl font-black accent">${fmt(total*v/100)}</div>
+        </div>`).join("")}
+    </div>
+
+    <div class="flex items-center justify-between">
+      <div class="flex gap2">
+        ${["mensile","annuale"].map(m=>`<button class="pill${_financeView===m?" active":""}" onclick="setFinanceView('${m}')">${m}</button>`).join("")}
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openModal('payment-form',null)">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg> Registra pagamento
+      </button>
+    </div>
+
+    ${_financeView==="mensile"?`
+    <div class="space-y-3">
+      ${Object.keys(byMonth).length===0?`<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Nessun pagamento registrato.</div>`:""}
+      ${Object.entries(byMonth).sort((a,b)=>b[0].localeCompare(a[0])).map(([month,ps])=>`
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="flex justify-between items-center" style="padding:12px 16px;border-bottom:1px solid var(--border)">
+            <span class="font-bold text-sm">${month}</span>
+            <span class="font-black green">${fmt(ps.reduce((s,p)=>s+p.amount,0))}</span>
+          </div>
+          ${ps.map(p=>{const cl=state.clients.find(c=>c.id===p.clientId);return`
+            <div class="flex justify-between items-center" style="padding:10px 16px;border-bottom:1px solid var(--border)">
+              <div>
+                <div class="text-sm font-semi">${cl?.name||"—"}</div>
+                <div class="text-xs muted">${p.note||cl?.service||""} · ${fmtDate(p.date)}</div>
+              </div>
+              <span class="font-bold text-sm green">${fmt(p.amount)}</span>
+            </div>`}).join("")}
+        </div>`).join("")}
+    </div>`:`
+    <div class="card" style="padding:0;overflow:hidden">
+      ${Object.keys(byYear).length===0?`<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">Nessun dato.</div>`:""}
+      ${Object.entries(byYear).sort((a,b)=>b[0].localeCompare(a[0])).map(([y,t])=>`
+        <div class="flex justify-between items-center" style="padding:14px 16px;border-bottom:1px solid var(--border)">
+          <span class="font-bold">${y}</span>
+          <span class="font-black text-lg green">${fmt(t)}</span>
+        </div>`).join("")}
+    </div>`}
+  </div>`;
+}
+function setFinanceView(v){_financeView=v;render()}
+
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
+function renderSettings(){
+  const s=state.settings;
+  const total=Object.values(s.splits).reduce((a,v)=>a+Number(v),0);
+  return `
+  <div class="space-y-4" style="max-width:520px">
+    <div class="card">
+      <div class="font-bold mb3">Attività</div>
+      <div class="field"><label>Nome attività</label><input id="s-name" value="${s.businessName||''}"/></div>
+      <div class="field"><label>Giorni per alert follow-up</label><input id="s-days" type="number" value="${s.alertDays||7}"/></div>
+    </div>
+    <div class="card">
+      <div class="font-bold mb1">Ripartizione pagamenti</div>
+      <div class="text-xs muted mb3">Totale: <span style="color:${total!==100?'#ef4444':'#10b981'};font-weight:700">${total}%</span> (deve fare 100%)</div>
+      <div id="splits-list">
+        ${Object.entries(s.splits).map(([k,v])=>`
+          <div class="flex gap2 items-center mb2" id="split-row-${k}">
+            <input value="${k}" readonly style="flex:1"/>
+            <input type="number" value="${v}" style="width:70px" oninput="updateSplit('${k}',this.value)"/>
+            <span class="muted text-sm">%</span>
+            <button class="btn btn-danger btn-sm" onclick="removeSplit('${k}')">✕</button>
+          </div>`).join("")}
+      </div>
+      <div class="flex gap2 mt3">
+        <input id="new-split-key" placeholder="Nome voce..." style="flex:1"/>
+        <input id="new-split-val" type="number" placeholder="%" style="width:70px"/>
+        <button class="btn btn-ghost btn-sm" onclick="addSplit()">+ Aggiungi</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSettings()">✓ Salva impostazioni</button>
+  </div>`;
+}
+function updateSplit(k,v){state.settings.splits[k]=Number(v);save();/* re-render only total */const t=Object.values(state.settings.splits).reduce((a,x)=>a+Number(x),0);document.querySelector("#splits-list + * .text-xs span")||null;}
+function removeSplit(k){delete state.settings.splits[k];save();render();}
+function addSplit(){const k=document.getElementById("new-split-key")?.value.trim();const v=document.getElementById("new-split-val")?.value;if(k&&v){state.settings.splits[k]=Number(v);save();render();}}
+function saveSettings(){
+  state.settings.businessName=document.getElementById("s-name")?.value||"Niky CRM";
+  state.settings.alertDays=Number(document.getElementById("s-days")?.value)||7;
+  // collect splits from inputs
+  const rows=document.querySelectorAll("[id^='split-row-']");
+  const newSplits={};
+  rows.forEach(row=>{const inputs=row.querySelectorAll("input");if(inputs[0]&&inputs[1])newSplits[inputs[0].value]=Number(inputs[1].value);});
+  state.settings.splits=newSplits;
+  save();render();
+  alert("Impostazioni salvate ✓");
+}
+
+// ─── MODALS ───────────────────────────────────────────────────────────────────
+function openModal(type, clientId){
+  const overlay=document.createElement("div");
+  overlay.className="modal-overlay";
+  overlay.id="modal-overlay";
+  overlay.onclick=e=>{if(e.target===overlay)closeModal();};
+
+  if(type==="client-form"){
+    const existing=clientId?state.clients.find(c=>c.id===clientId):null;
+    const c=existing||{id:uid(),name:"",email:"",phone:"",service:SERVICES[0],stage:STAGES[0],amount:"",payState:"Non pagato",notes:"",createdAt:today(),updatedAt:today(),archived:false};
+    overlay.innerHTML=`
+      <div class="modal">
+        <div class="modal-header">
+          <span class="font-bold">${existing?"Modifica cliente":"Nuovo cliente"}</span>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="field"><label>Nome / Ragione sociale</label><input id="cf-name" value="${c.name}" placeholder="Mario Rossi"/></div>
+          <div class="field"><label>Email</label><input id="cf-email" type="email" value="${c.email||''}" placeholder="mario@esempio.it"/></div>
+          <div class="field"><label>Telefono</label><input id="cf-phone" value="${c.phone||''}" placeholder="+39 333 0000000"/></div>
+          <div class="field"><label>Tipo servizio</label>
+            <select id="cf-service">${SERVICES.map(s=>`<option${c.service===s?" selected":""}>${s}</option>`).join("")}</select>
+          </div>
+          <div class="field"><label>Fase pipeline</label>
+            <select id="cf-stage">${STAGES.map(s=>`<option${c.stage===s?" selected":""}>${s}</option>`).join("")}</select>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Importo preventivo (€)</label><input id="cf-amount" type="number" value="${c.amount||''}"/></div>
+            <div class="field"><label>Stato pagamento</label>
+              <select id="cf-pay">${PAY_STATES.map(s=>`<option${c.payState===s?" selected":""}>${s}</option>`).join("")}</select>
+            </div>
+          </div>
+          <div class="field"><label>Note</label><textarea id="cf-notes">${c.notes||''}</textarea></div>
+          <div class="flex gap2 justify-end mt3">
+            <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="saveClientForm('${c.id}','${!!existing}')">Salva cliente</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if(type==="payment-form"){
+    const activeClients=state.clients.filter(c=>!c.archived);
+    overlay.innerHTML=`
+      <div class="modal">
+        <div class="modal-header">
+          <span class="font-bold">Registra pagamento</span>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="field"><label>Cliente</label>
+            <select id="pf-client">${activeClients.map(c=>`<option value="${c.id}">${c.name}</option>`).join("")}</select>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Importo (€)</label><input id="pf-amount" type="number" placeholder="0" oninput="updatePaySplit()"/></div>
+            <div class="field"><label>Data</label><input id="pf-date" type="date" value="${today()}"/></div>
+          </div>
+          <div class="field"><label>Nota</label><input id="pf-note" placeholder="Saldo, acconto..."/></div>
+          <div id="pay-split-preview" class="card-sm mb3" style="display:none">
+            <div class="text-xs upper muted mb2">Ripartizione automatica</div>
+          </div>
+          <div class="flex gap2 justify-end">
+            <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="savePaymentForm()">Registra</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  document.body.appendChild(overlay);
+}
+
+function updatePaySplit(){
+  const amt=Number(document.getElementById("pf-amount")?.value||0);
+  const preview=document.getElementById("pay-split-preview");
+  if(!preview) return;
+  if(!amt){preview.style.display="none";return;}
+  preview.style.display="block";
+  preview.innerHTML=`<div class="text-xs upper muted mb2">Ripartizione automatica</div>`+
+    Object.entries(state.settings.splits).map(([k,v])=>
+      `<div class="flex justify-between text-sm py1"><span class="muted">${k} (${v}%)</span><span class="font-bold">${fmt(amt*v/100)}</span></div>`
+    ).join("");
+}
+
+function closeModal(){document.getElementById("modal-overlay")?.remove();}
+
+function saveClientForm(id, isEdit){
+  const c={
+    id,
+    name:document.getElementById("cf-name")?.value||"",
+    email:document.getElementById("cf-email")?.value||"",
+    phone:document.getElementById("cf-phone")?.value||"",
+    service:document.getElementById("cf-service")?.value||SERVICES[0],
+    stage:document.getElementById("cf-stage")?.value||STAGES[0],
+    amount:document.getElementById("cf-amount")?.value||"",
+    payState:document.getElementById("cf-pay")?.value||"Non pagato",
+    notes:document.getElementById("cf-notes")?.value||"",
+    updatedAt:today(),
+    archived:false,
+  };
+  if(isEdit==="true"){
+    const orig=state.clients.find(x=>x.id===id);
+    c.createdAt=orig?.createdAt||today();
+    c.archived=orig?.archived||false;
+    state.clients=state.clients.map(x=>x.id===id?c:x);
+    state.events=[...state.events,{id:uid(),clientId:id,date:today(),text:"Dati aggiornati",type:"edit"}];
+  } else {
+    c.createdAt=today();
+    state.clients=[...state.clients,c];
+    state.events=[...state.events,{id:uid(),clientId:id,date:today(),text:"Cliente creato",type:"create"}];
+  }
+  save();closeModal();render();
+}
+
+function savePaymentForm(){
+  const amount=Number(document.getElementById("pf-amount")?.value||0);
+  const clientId=document.getElementById("pf-client")?.value;
+  const date=document.getElementById("pf-date")?.value||today();
+  const note=document.getElementById("pf-note")?.value||"";
+  if(!amount||!clientId) return alert("Inserisci cliente e importo.");
+  state.payments=[...state.payments,{id:uid(),clientId,amount,date,note}];
+  state.clients=state.clients.map(c=>c.id===clientId?{...c,payState:"Pagato",updatedAt:today()}:c);
+  state.events=[...state.events,{id:uid(),clientId,date,text:`Pagamento: ${fmt(amount)}`,type:"payment"}];
+  save();closeModal();render();
+}
+
+// ─── MISC EVENTS ──────────────────────────────────────────────────────────────
+function toggleDark(){state.dark=!state.dark;save();render();}
+function attachEvents(){}
+
+// ─── SERVICE WORKER ───────────────────────────────────────────────────────────
+if("serviceWorker" in navigator){
+  const sw=`
+    const CACHE="niky-crm-v1";
+    const FILES=["./","./index.html","./manifest.json","./icon-192.png","./icon-512.png"];
+    self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
+    self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
+  `;
+  const blob=new Blob([sw],{type:"application/javascript"});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
