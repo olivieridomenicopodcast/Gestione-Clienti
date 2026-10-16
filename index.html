@@ -198,6 +198,20 @@ function projSplitRows(proj){
   }
   return calcSplits(Object.entries(S.settings.splits),amt,false);
 }
+// ─── IMPONIBILE / INPS / RESIDUO PROGETTO ─────────────────────────────────────
+const INPS_RATE=0.04, r2=n=>Math.round((Number(n)||0)*100)/100;
+// imponibile del progetto: totale senza rivalsa INPS (la marca da bollo non fa parte del progetto)
+const projNet=pr=>pr?r2(pr.rivalsaINPS?Number(pr.amount||0)/(1+INPS_RATE):Number(pr.amount||0)):0;
+// imponibile di un pagamento (importo senza INPS e senza bollo); per i vecchi pagamenti l'INPS era già nell'importo digitato
+function payNet(p){
+  if(p.imponibile!==undefined)return Number(p.imponibile)||0;
+  const pr=p.projectId?S.projects.find(x=>x.id===p.projectId):null;
+  const b=Number(p.amountBase??p.amount)||0;
+  return r2(pr?.rivalsaINPS?b/(1+INPS_RATE):b);
+}
+// imponibile già registrato nei pagamenti del progetto (escluso un pagamento in modifica)
+const projRegistered=(pid,exceptId)=>r2(S.payments.filter(p=>p.projectId===pid&&p.id!==exceptId).reduce((s,p)=>s+payNet(p),0));
+const projResidual=(proj,exceptId)=>r2(projNet(proj)-projRegistered(proj.id,exceptId));
 // ripartizione effettiva (in €) di un pagamento: la sua, altrimenti quella del progetto, altrimenti il default
 function paySplits(p){
   const base=Number(p.amountBase??p.amount)||0;
@@ -452,8 +466,13 @@ function pgDetail(){
           <button class="btn btn-ghost btn-sm" onclick="openProjSplitModal('${proj.id}')">✏️ Modifica</button>
         </div>
         <div class="card-sm mb3" style="background:var(--bg)">
-          ${projSplitRows(proj).map(r=>`<div class="split-row"><span class="muted">${r.k}${r.pct!==undefined?` (${+r.pct.toFixed(1)}%)`:""}</span><span class="font-bold">${fmt(r.eur)}</span></div>`).join("")}
+          ${(()=>{const reg={};pPays.forEach(pp=>paySplits(pp).forEach(r=>{reg[r.k]=(reg[r.k]||0)+r.eur;}));
+            return projSplitRows(proj).map(r=>`<div class="split-row"><span class="muted">${r.k}${r.pct!==undefined?` (${+r.pct.toFixed(1)}%)`:""}</span><span class="font-bold">${fmt(r.eur)}${pPays.length?` <span class="text-xs muted" style="font-weight:500">· nei pagamenti ${fmt(reg[r.k]||0)}</span>`:""}</span></div>`).join("");})()}
         </div>
+        ${proj.amount>0?`<div class="card-sm mb3" style="background:var(--bg)">
+          <div class="split-row"><span class="muted">Pagamenti registrati (base${proj.rivalsaINPS?", senza INPS":""})</span><span class="font-bold">${fmt(projRegistered(proj.id))} su ${fmt(projNet(proj))}</span></div>
+          <div class="split-row"><span class="font-bold">Residuo da registrare</span><span class="font-black" style="color:${projResidual(proj)<-0.005?"var(--red)":"var(--accent)"}">${fmt(projResidual(proj))}</span></div>
+        </div>`:""}
 
         <!-- payments list -->
         <div class="flex justify-between items-center mb2">
@@ -470,6 +489,7 @@ function pgDetail(){
               <span class="badge" style="background:${sc2}20;color:${sc2};border:1px solid ${sc2}40;font-size:10px">${p.status||"Pagato"}</span>
             </div>
             <div class="text-xs muted">${p.note||"—"} · ${fmtD(p.date)}</div>
+            ${proj.rivalsaINPS?`<div class="text-xs muted">${fmt(payNet(p))} + ${fmt(Number(p.amountBase??p.amount)-payNet(p))} INPS 4%</div>`:""}
             <div class="text-xs mt1">${p.customSplits?`<span style="color:var(--accent)">⚙️ ${p.customSplitsMode==="pct"?"% custom":"€ custom"}</span>`:proj.splits?`<span class="muted">📁 come progetto</span>`:`<span class="muted">📊 default</span>`}</div>
           </div>
           <div class="flex gap1">
@@ -774,6 +794,12 @@ function pgSettings(){
     </div>
     <div id="gh-msg" class="text-sm mt2"></div>
   </div>
+  <div class="card">
+    <div class="font-bold mb1">🧰 Sistema ripartizioni</div>
+    <div class="text-sm muted mb3">Per i progetti con un solo pagamento che ha una ripartizione personalizzata e il progetto senza: sposta quei valori nella ripartizione del progetto. Il pagamento resta com'è. Prima mostra un'anteprima.</div>
+    <button class="btn btn-ghost" onclick="fixSplits()">Sistema ripartizioni</button>
+    <div id="fx-msg" class="text-sm mt2"></div>
+  </div>
   <div class="card" style="border-color:#ef444440">
     <div class="font-bold mb1" style="color:#ef4444">⚠️ Zona pericolo</div>
     <div class="text-sm muted mb3">Cancella tutti i dati dell'app (clienti, progetti, pagamenti, eventi). Le impostazioni vengono mantenute. Irreversibile.</div>
@@ -815,6 +841,36 @@ function doImport(inp){
     }catch{showMsg("bk-msg","✗ File non valido","#ef4444");}
   };r.readAsText(f);inp.value="";
 }
+// ─── SISTEMA RIPARTIZIONI (da pagamento a progetto) ───────────────────────────
+function fixSplits(){
+  const todo=[],skipped=[];
+  S.projects.forEach(pr=>{
+    if(pr.splits)return;
+    const pays=S.payments.filter(p=>p.projectId===pr.id);
+    const withCs=pays.filter(p=>p.customSplits);
+    if(!withCs.length)return;
+    const cl=S.clients.find(c=>c.id===pr.clientId)?.name||"—";
+    const label=`${cl} · ${pr.name}`;
+    if(pays.length!==1){skipped.push(`${label}: più pagamenti, da sistemare a mano`);return;}
+    const pay=withCs[0],mode=pay.customSplitsMode||"eur";
+    const rows=orderSplits(Object.entries(pay.customSplits),x=>x[0]).map(([name,value])=>({name,value:Number(value)||0}));
+    if(mode==="eur"){
+      const sum=rows.reduce((t,r)=>t+r.value,0);
+      if(Math.abs(sum-Number(pr.amount||0))>0.05){skipped.push(`${label}: la ripartizione (${fmt(sum)}) non coincide col totale progetto (${fmt(pr.amount)})`);return;}
+    }
+    todo.push({pr,pay,label,split:{mode,cinq:!!pay.customSplitsCinq&&mode==="pct",rows}});
+  });
+  if(!todo.length){showMsg("fx-msg",skipped.length?"Niente da sistemare. Saltati: "+skipped.join("; "):"✓ Niente da sistemare","var(--muted)",9000);return;}
+  const txt=todo.map(t=>`• ${t.label}: ${t.split.rows.map(r=>`${r.name} ${r.value}${t.split.mode==="pct"?"%":"€"}`).join(", ")}`).join("\n");
+  if(!confirm(`Spostare la ripartizione dal pagamento al progetto?\n\n${txt}${skipped.length?"\n\nSaltati:\n"+skipped.join("\n"):""}`))return;
+  todo.forEach(t=>{
+    S.projects=S.projects.map(x=>x.id===t.pr.id?{...x,splits:t.split}:x);
+    S.payments=S.payments.map(x=>{if(x.id!==t.pay.id)return x;const{customSplits,customSplitsMode,customSplitsCinq,...rest}=x;return rest;});
+    S.events=[...S.events,{id:uid(),clientId:t.pr.clientId,date:today(),text:`Ripartizione spostata dal pagamento al progetto "${t.pr.name}"`,type:"edit"}];
+  });
+  save();render();showMsg("fx-msg",`✓ Sistemati ${todo.length} progetti`,"#10b981",6000);
+}
+
 // ─── SYNC GITHUB ──────────────────────────────────────────────────────────────
 function saveSync(){
   SYNC.token=(document.getElementById("gh-token")?.value||"").trim();
@@ -1326,6 +1382,7 @@ function saveProjSplit(pid){
 // ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
 function openPayModal(preClientId, preProjectId, editPayId){
   const existing=editPayId?S.payments.find(p=>p.id===editPayId):null;
+  window._payEditId=editPayId||null;
   const ac=S.clients.filter(c=>!c.archived);
   if(!ac.length){alert("Nessun cliente attivo.");return;}
   const effClientId=existing?.clientId||preClientId||ac[0]?.id;
@@ -1334,7 +1391,7 @@ function openPayModal(preClientId, preProjectId, editPayId){
   speInit("pay",{
     areaId:"pay-split-area",title:"Ripartizione personalizzata (opzionale)",
     offNote:"Off = vale la ripartizione del progetto",
-    getAmt:()=>Number(document.getElementById("pf-a")?.value||0),
+    getAmt:()=>payCalc().baseInps,
     seed:()=>{
       const proj=S.projects.find(p=>p.id===document.getElementById("pf-pr")?.value);
       const e=proj?.splits?defPctEntries(proj.splits):[];
@@ -1366,11 +1423,11 @@ function openPayModal(preClientId, preProjectId, editPayId){
         <select id="pf-cl" onchange="updateProjSelect()">${ac.map(c=>`<option value="${c.id}"${c.id===effClientId?" selected":""}>${c.name}</option>`).join("")}</select>
       </div>
       <div class="field"><label>Progetto (opzionale)</label>
-        <select id="pf-pr">${projOpts(effClientId)}</select>
+        <select id="pf-pr" onchange="onPayChange()">${projOpts(effClientId)}</select>
       </div>
       <div class="grid2">
-        <div class="field"><label>Importo (€)</label>
-          <input id="pf-a" type="number" placeholder="0" value="${existing?(existing.amountBase??existing.amount):""}" oninput="onPayChange()"/>
+        <div class="field"><label>Importo base (€)</label>
+          <input id="pf-a" type="number" step="0.01" placeholder="0" value="${existing?payNet(existing):""}" oninput="onPayChange()"/>
         </div>
         <div class="field"><label>Data</label>
           <input id="pf-d" type="date" value="${existing?.date||today()}"/>
@@ -1413,39 +1470,53 @@ function updateProjSelect(){
   const ps=S.projects.filter(p=>p.clientId===cid&&!p.archived);
   sel.innerHTML=`<option value="">— nessun progetto specifico —</option>`+
     ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+  onPayChange();
+}
+
+// importi del pagamento in compilazione: base + INPS (se il progetto ha la rivalsa) + bollo
+function payCalc(editId){
+  const net=r2(document.getElementById("pf-a")?.value||0);
+  const bollo=document.getElementById("pf-bollo")?.checked||false;
+  const proj=S.projects.find(x=>x.id===document.getElementById("pf-pr")?.value)||null;
+  const inps=proj?.rivalsaINPS?r2(net*INPS_RATE):0;
+  const baseInps=r2(net+inps);
+  const residual=proj&&proj.amount>0?projResidual(proj,editId||window._payEditId):null;
+  return{net,inps,baseInps,bollo,total:r2(baseInps+(bollo?2:0)),proj,residual,over:residual!==null&&net>residual+0.005};
 }
 
 function onPayChange(){
-  const amt=Number(document.getElementById("pf-a")?.value||0);
-  const bollo=document.getElementById("pf-bollo")?.checked||false;
+  const c=payCalc();
   const status=document.getElementById("pf-status")?.value||"Pagato";
   const isPaid=status==="Pagato";
   const totalLabel=isPaid?"Totale incassato":"Totale previsto";
   const totalColor=isPaid?"var(--green)":"var(--yellow)";
   const tot=document.getElementById("pay-total-area");
-  if(tot)tot.innerHTML=amt?`<div class="card-sm mb3" style="background:var(--bg)">
-      ${bollo?`<div class="split-row"><span class="muted">Marca da bollo</span><span class="font-bold">+ ${fmt(2)}</span></div>`:""}
-      <div class="split-row"><span class="font-bold">${totalLabel}</span><span class="font-black" style="color:${totalColor}">${fmt(amt+(bollo?2:0))}</span></div>
+  if(tot)tot.innerHTML=(c.net||c.residual!==null)?`<div class="card-sm mb3" style="background:var(--bg);${c.over?"border-color:#ef4444":""}">
+      ${c.residual!==null?`<div class="split-row"><span class="muted">Residuo del progetto (base)</span><span class="font-bold" style="color:${c.over?"var(--red)":"var(--accent)"}">${fmt(c.residual)}</span></div>`:""}
+      ${c.over?`<div class="text-xs red mb1">Importo oltre il residuo: non si può salvare.</div>`:""}
+      ${c.net?`<div class="split-row"><span class="muted">Base</span><span class="font-bold">${fmt(c.net)}</span></div>`:""}
+      ${c.inps?`<div class="split-row"><span class="muted">Rivalsa INPS 4%</span><span class="font-bold">+ ${fmt(c.inps)}</span></div>`:""}
+      ${c.bollo?`<div class="split-row"><span class="muted">Marca da bollo</span><span class="font-bold">+ ${fmt(2)}</span></div>`:""}
+      ${c.net?`<div class="split-row"><span class="font-bold">${totalLabel}</span><span class="font-black" style="color:${totalColor}">${fmt(c.total)}</span></div>`:""}
     </div>`:"";
   // gli importi per voce dipendono dall'importo
   if(SPE.pay?.on)speRender("pay");
 }
 
-
 function savePay(editId){
-  const amt=Number(document.getElementById("pf-a")?.value||0);
-  const bollo=document.getElementById("pf-bollo")?.checked||false;
+  const c=payCalc(editId);
+  const amt=c.net,bollo=c.bollo,totalAmt=c.total;
   const status=document.getElementById("pf-status")?.value||"Pagato";
-  const totalAmt=amt+(bollo?2:0);
   const cid=document.getElementById("pf-cl")?.value;
   const projId=document.getElementById("pf-pr")?.value||null;
   const date=document.getElementById("pf-d")?.value||today();
   const note=document.getElementById("pf-no")?.value||"";
   if(!amt||!cid){alert("Inserisci cliente e importo.");return;}
+  if(c.over){alert(`L'importo base (${fmt(amt)}) supera il residuo del progetto (${fmt(c.residual)}).`);return;}
 
   const pay={
     id:editId||uid(), clientId:cid, projectId:projId||null,
-    amount:totalAmt, amountBase:amt, marcaBollo:bollo,
+    amount:totalAmt, amountBase:c.baseInps, imponibile:amt, inps:c.inps, marcaBollo:bollo,
     status, date, note
   };
   const cs=speResult("pay");
