@@ -787,7 +787,7 @@ function pgSettings(){
   </div>
   <div class="card">
     <div class="font-bold mb1">🔄 Sync GitHub</div>
-    <div class="text-sm muted mb3">Sincronizza i dati con un file JSON su GitHub. Il repository deve essere <strong>privato</strong>: il push viene rifiutato su repository pubblici.</div>
+    <div class="text-sm muted mb3">Sincronizza i dati con un file JSON su GitHub. Funziona con qualsiasi tuo repository. Se è pubblico, il file dei dati è leggibile da chiunque.</div>
     <div class="field"><label>Token GitHub</label><input id="gh-token" type="password" autocomplete="off" placeholder="ghp_… / github_pat_…" value="${SYNC.token||""}" onchange="saveSync()"/></div>
     <div class="field"><label>Repository (utente/repo)</label><input id="gh-repo" placeholder="olivieridomenicopodcast/nikycrm-dati" value="${SYNC.repo||""}" onchange="saveSync()"/></div>
     <div class="flex gap2" style="flex-wrap:wrap">
@@ -863,7 +863,6 @@ async function ghPush(){
   try{
     const rr=await ghApi(`/repos/${SYNC.repo}`);
     if(!rr.ok)throw new Error("Repository non trovato (404)");
-    if(!(await rr.json()).private)throw new Error("Il repository è pubblico: usa un repository privato");
     const url=`/repos/${SYNC.repo}/contents/${SYNC.path}`;
     const cur=await ghApi(url);
     const body={message:`NikyCRM sync ${new Date().toISOString()}`,content:b64enc(JSON.stringify(buildData(),null,2))};
