@@ -136,7 +136,7 @@ const S={
 function normSettings(){if(!S.settings.businessName||["DomePodcast","Niky CRM"].includes(S.settings.businessName))S.settings.businessName="NikyCRM";delete S.settings.ghToken;}
 normSettings();
 // sync GitHub: token e repo restano solo su questo dispositivo (mai nei backup)
-const SYNC=LS.get("crm_sync",{token:"",repo:"",path:"nikycrm-data.json"});
+const SYNC=LS.get("crm_sync",{token:"",gist:""});
 function save(){
   LS.set("crm_clients",S.clients);LS.set("crm_events",S.events);
   LS.set("crm_payments",S.payments);LS.set("crm_projects",S.projects);
@@ -787,9 +787,11 @@ function pgSettings(){
   </div>
   <div class="card">
     <div class="font-bold mb1">🔄 Sync GitHub</div>
-    <div class="text-sm muted mb3">Sincronizza i dati con un file JSON su GitHub. Funziona con qualsiasi tuo repository. Se è pubblico, il file dei dati è leggibile da chiunque.</div>
+    <div class="text-sm muted mb3">Sincronizza i dati con un Gist GitHub (file <code>nikycrm-data.json</code>). Il token deve avere il permesso <strong>gist</strong>. Lascia vuoto l'ID: al primo Push ne creo uno nuovo e lo salvo qui.</div>
     <div class="field"><label>Token GitHub</label><input id="gh-token" type="password" autocomplete="off" placeholder="ghp_… / github_pat_…" value="${SYNC.token||""}" onchange="saveSync()"/></div>
-    <div class="field"><label>Repository (utente/repo)</label><input id="gh-repo" placeholder="olivieridomenicopodcast/nikycrm-dati" value="${SYNC.repo||""}" onchange="saveSync()"/></div>
+    <div class="field"><label>ID Gist</label>
+      <div class="flex gap2"><input id="gh-gist" placeholder="vuoto = ne crea uno nuovo" value="${SYNC.gist||""}" onchange="saveSync()" style="flex:1"/>
+      <button class="btn btn-ghost" onclick="saveSync(true)">💾 Salva</button></div></div>
     <div class="flex gap2" style="flex-wrap:wrap">
       <button class="btn btn-ghost" onclick="ghPull()">${IC.dl} Pull ⬇</button>
       <button class="btn btn-primary" onclick="ghPush()">${IC.ul} Push ⬆</button>
@@ -838,52 +840,62 @@ function doImport(inp){
   };r.readAsText(f);inp.value="";
 }
 // ─── SYNC GITHUB ──────────────────────────────────────────────────────────────
-function saveSync(){
+function saveSync(show){
   SYNC.token=(document.getElementById("gh-token")?.value||"").trim();
-  SYNC.repo=(document.getElementById("gh-repo")?.value||"").trim().replace(/^https?:\/\/github\.com\//,"").replace(/\.git$/,"").replace(/\/$/,"");
+  // accetta anche l'URL completo del gist: l'ID è l'ultimo pezzo
+  SYNC.gist=(document.getElementById("gh-gist")?.value||"").trim().replace(/[?#].*$/,"").replace(/\/$/,"").split("/").pop();
+  const g=document.getElementById("gh-gist");if(g)g.value=SYNC.gist;
   LS.set("crm_sync",SYNC);
+  if(show===true)showMsg("gh-msg","✓ Salvato","#10b981");
 }
-const b64enc=str=>{const b=new TextEncoder().encode(str);let s="";b.forEach(c=>s+=String.fromCharCode(c));return btoa(s);};
+const GH_FILE="nikycrm-data.json";
 const b64dec=str=>new TextDecoder().decode(Uint8Array.from(atob(str.replace(/\s/g,"")),c=>c.charCodeAt(0)));
 async function ghApi(path,opt={}){
   const r=await fetch("https://api.github.com"+path,{...opt,headers:{Accept:"application/vnd.github+json",Authorization:"Bearer "+SYNC.token,...(opt.headers||{})}});
   if(r.status===401)throw new Error("Token non valido");
-  if(r.status===403)throw new Error("Accesso negato (permessi del token?)");
+  if(r.status===403)throw new Error("Accesso negato (il token ha il permesso gist?)");
   return r;
 }
 function ghCheck(){
   saveSync();
   if(!SYNC.token){showMsg("gh-msg","✗ Inserisci il token","#ef4444");return false;}
-  if(!/^[\w.-]+\/[\w.-]+$/.test(SYNC.repo)){showMsg("gh-msg","✗ Inserisci il repository (utente/repo)","#ef4444");return false;}
   return true;
+}
+async function ghCreateGist(){
+  const r=await ghApi("/gists",{method:"POST",body:JSON.stringify({description:"NikyCRM dati",public:false,files:{[GH_FILE]:{content:JSON.stringify(buildData(),null,2)}}})});
+  if(!r.ok)throw new Error("Creazione gist fallita ("+r.status+")");
+  SYNC.gist=(await r.json()).id;LS.set("crm_sync",SYNC);
+  const g=document.getElementById("gh-gist");if(g)g.value=SYNC.gist;
+  return SYNC.gist;
 }
 async function ghPush(){
   if(!ghCheck())return;
   showMsg("gh-msg","… push in corso","var(--muted)",60000);
   try{
-    const rr=await ghApi(`/repos/${SYNC.repo}`);
-    if(!rr.ok)throw new Error("Repository non trovato (404)");
-    const url=`/repos/${SYNC.repo}/contents/${SYNC.path}`;
-    const cur=await ghApi(url);
-    const body={message:`NikyCRM sync ${new Date().toISOString()}`,content:b64enc(JSON.stringify(buildData(),null,2))};
-    if(cur.ok)body.sha=(await cur.json()).sha;
-    else if(cur.status!==404)throw new Error("Errore GitHub "+cur.status);
-    const r=await ghApi(url,{method:"PUT",body:JSON.stringify(body)});
-    if(!r.ok)throw new Error("Push fallito ("+r.status+")");
-    showMsg("gh-msg","✓ Push completato","#10b981");
+    if(SYNC.gist){
+      const r=await ghApi("/gists/"+SYNC.gist,{method:"PATCH",body:JSON.stringify({files:{[GH_FILE]:{content:JSON.stringify(buildData(),null,2)}}})});
+      if(r.ok){showMsg("gh-msg","✓ Push completato","#10b981");return;}
+      if(r.status!==404)throw new Error("Push fallito ("+r.status+")");
+      const old=SYNC.gist;const id=await ghCreateGist();
+      showMsg("gh-msg",`✓ Gist ${old.slice(0,8)}… non trovato: creato nuovo gist ${id}`,"#10b981",9000);return;
+    }
+    const id=await ghCreateGist();
+    showMsg("gh-msg",`✓ Creato nuovo gist ${id} e push completato`,"#10b981",9000);
   }catch(e){showMsg("gh-msg","✗ "+e.message,"#ef4444");}
 }
 async function ghPull(){
   if(!ghCheck())return;
+  if(!SYNC.gist){showMsg("gh-msg","✗ Inserisci l'ID del gist (o fai prima un Push)","#ef4444");return;}
   showMsg("gh-msg","… pull in corso","var(--muted)",60000);
   try{
-    const r=await ghApi(`/repos/${SYNC.repo}/contents/${SYNC.path}`);
-    if(r.status===404)throw new Error("Nessun dato trovato: fai prima un push");
+    const r=await ghApi("/gists/"+SYNC.gist);
+    if(r.status===404)throw new Error("Gist non trovato");
     if(!r.ok)throw new Error("Pull fallito ("+r.status+")");
-    const j=await r.json();
-    let d;
-    if(j.content)d=JSON.parse(b64dec(j.content));
-    else{const raw=await ghApi(`/repos/${SYNC.repo}/contents/${SYNC.path}`,{headers:{Accept:"application/vnd.github.raw+json"}});d=JSON.parse(await raw.text());}
+    const f=(await r.json()).files?.[GH_FILE];
+    if(!f)throw new Error(`Nel gist manca il file ${GH_FILE}`);
+    let txt=f.content;
+    if(f.truncated||txt===undefined){const raw=await fetch(f.raw_url);txt=await raw.text();}
+    const d=JSON.parse(txt);
     if(!d.clients)throw new Error("File non valido");
     const ts=d.exportedAt?new Date(d.exportedAt).toLocaleString("it-IT"):"data sconosciuta";
     if(!confirm(`Scaricare i dati del ${ts}?\nSovrascrive TUTTI i dati di questo dispositivo.`)){showMsg("gh-msg","Pull annullato","var(--muted)");return;}
