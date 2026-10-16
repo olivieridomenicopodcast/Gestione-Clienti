@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Niky CRM</title>
+<title>NikyCRM</title>
 <link rel="manifest" href="./manifest.json"/>
 <link rel="apple-touch-icon" href="./icon-192.png"/>
 <link rel="icon" type="image/png" href="./icon-192.png"/>
@@ -126,11 +126,17 @@ const S={
   events:  LS.get("crm_events",[]),
   payments:LS.get("crm_payments",[]),
   projects:LS.get("crm_projects",[]),
-  settings:LS.get("crm_settings",{businessName:"Niky CRM",alertDays:7,splits:{Tasse:25,"Fondo emergenza":10,Reinvestimento:15,Disponibile:50}}),
+  settings:LS.get("crm_settings",{businessName:"NikyCRM",alertDays:7,splits:{Tasse:25,"Fondo emergenza":10,Reinvestimento:15,Disponibile:50}}),
   dark:LS.get("crm_dark",true),
   page:"dashboard", selClient:null, selProject:null,
-  openProjects:{} // which project cards are expanded
+  openProjects:{}, // which project cards are expanded
+  openSections:{}  // sezioni progetti completati / archiviati aperte
 };
+// il nome dell'app è NikyCRM (vecchi nomi salvati vengono aggiornati)
+function normSettings(){if(!S.settings.businessName||["DomePodcast","Niky CRM"].includes(S.settings.businessName))S.settings.businessName="NikyCRM";delete S.settings.ghToken;}
+normSettings();
+// sync GitHub: token e repo restano solo su questo dispositivo (mai nei backup)
+const SYNC=LS.get("crm_sync",{token:"",repo:"",path:"nikycrm-data.json"});
 function save(){
   LS.set("crm_clients",S.clients);LS.set("crm_events",S.events);
   LS.set("crm_payments",S.payments);LS.set("crm_projects",S.projects);
@@ -162,7 +168,48 @@ function projPayState(pid,amount){
   if(p>=Number(amount||0))return"Pagato";
   return"Parziale";
 }
-function defSplits(amt){const o={};Object.entries(S.settings.splits).forEach(([k,v])=>o[k]=Number(amt)*v/100);return o;}
+// "Per me" sempre in fondo (ordine stabile per le altre voci)
+const isPerMe=n=>String(n||"").trim().toLowerCase()==="per me";
+function orderSplits(arr,nameOf=x=>x[0]){return[...arr.filter(x=>!isPerMe(nameOf(x))),...arr.filter(x=>isPerMe(nameOf(x)))];}
+// entries [[nome,%]] → [{k,pct,eur}] ; con cinq: ogni voce arrotondata per difetto a 5€, gli esuberi vanno all'ultima voce
+function calcSplits(entries,base,cinq){
+  const list=orderSplits(entries.map(([k,v])=>[k,Number(v)||0]));
+  let rem=0;
+  return list.map(([k,pct],i)=>{
+    const raw=base*pct/100;
+    if(!cinq||!base)return{k,pct,eur:raw};
+    const rounded=Math.floor(raw/5)*5;rem+=raw-rounded;
+    return{k,pct,eur:i===list.length-1?rounded+rem:rounded};
+  });
+}
+// ripartizione di un progetto {mode,cinq,rows:[{name,value}]} → percentuali [[nome,%]]
+function defPctEntries(def){
+  const rows=(def?.rows||[]).filter(r=>r.name);
+  if(def?.mode==="pct")return rows.map(r=>[r.name,Number(r.value)||0]);
+  const tot=rows.reduce((s,r)=>s+(Number(r.value)||0),0);
+  return tot>0?rows.map(r=>[r.name,(Number(r.value)||0)/tot*100]):[];
+}
+// ripartizione (in €) mostrata per un progetto, calcolata sul suo totale
+function projSplitRows(proj){
+  const amt=Number(proj.amount)||0,sp=proj.splits;
+  if(sp?.rows?.length){
+    if(sp.mode==="eur")return orderSplits(sp.rows.map(r=>({k:r.name,eur:Number(r.value)||0})),x=>x.k);
+    return calcSplits(defPctEntries(sp),amt,sp.cinq);
+  }
+  return calcSplits(Object.entries(S.settings.splits),amt,false);
+}
+// ripartizione effettiva (in €) di un pagamento: la sua, altrimenti quella del progetto, altrimenti il default
+function paySplits(p){
+  const base=Number(p.amountBase??p.amount)||0;
+  if(p.customSplits){
+    const e=Object.entries(p.customSplits);
+    if((p.customSplitsMode||"eur")==="pct")return calcSplits(e,base,p.customSplitsCinq);
+    return orderSplits(e.map(([k,v])=>({k,eur:Number(v)||0})),x=>x.k);
+  }
+  const proj=p.projectId?S.projects.find(x=>x.id===p.projectId):null;
+  if(proj?.splits){const e=defPctEntries(proj.splits);if(e.length)return calcSplits(e,base,proj.splits.cinq);}
+  return calcSplits(Object.entries(S.settings.splits),base,false);
+}
 
 function sBadge(stage,map){
   map=map||SC;const c=map[stage]||"#64748b";
@@ -202,7 +249,7 @@ function render(){
   else if(S.page==="settings")pg=pgSettings();
   document.getElementById("app").innerHTML=`
     <header>
-      <div class="logo"><div class="logo-icon">${IC.mic}</div>${S.settings.businessName||"Niky CRM"}</div>
+      <div class="logo"><div class="logo-icon">${IC.mic}</div>${S.settings.businessName||"NikyCRM"}</div>
       <div class="flex items-center gap2">
         <nav class="nav-desktop">${dNav}</nav>
         <button class="btn btn-ghost btn-sm" onclick="toggleDark()">${S.dark?"☀️":"🌙"}</button>
@@ -245,7 +292,7 @@ function pgDash(){
 }
 
 // ─── CLIENTS LIST ─────────────────────────────────────────────────────────────
-let _fs="Tutti",_sr="",_sa=false;
+let _fs="Tutti",_sr="",_sa=false,_selArch=new Set();
 function pgClients(){
   const fl=S.clients.filter(c=>{
     if(!_sa&&c.archived)return false;if(_sa&&!c.archived)return false;
@@ -262,6 +309,10 @@ function pgClients(){
       <button class="btn btn-primary btn-sm" onclick="openClientModal(null)">${IC.plus} Nuovo</button>
     </div>
   </div>
+  ${_sa&&fl.length?`<div class="flex items-center justify-between gap2" style="flex-wrap:wrap">
+    <label class="flex items-center gap2 text-sm" style="cursor:pointer"><input type="checkbox" style="width:auto;accent-color:var(--accent)" ${fl.every(c=>_selArch.has(c.id))?"checked":""} onchange="selAllArch(this.checked)"/> Seleziona tutti</label>
+    <button class="btn btn-danger btn-sm" ${_selArch.size?"":"disabled style='opacity:.4;pointer-events:none'"} onclick="delClients([..._selArch])">🗑 Elimina selezionati (${_selArch.size})</button>
+  </div>`:""}
   <div class="space-y-2">
     ${fl.length===0?`<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Nessun cliente trovato.</div>`:""}
     ${fl.map(c=>{
@@ -273,6 +324,7 @@ function pgClients(){
       const stageColor=SC[c.stage]||"#64748b";
       return`<div class="client-row" onclick="openC('${c.id}')" style="flex-direction:column;align-items:stretch;gap:8px">
         <div class="flex items-center gap3">
+          ${_sa?`<input type="checkbox" style="width:auto;flex-shrink:0;accent-color:var(--accent)" ${_selArch.has(c.id)?"checked":""} onclick="event.stopPropagation()" onchange="selArch('${c.id}',this.checked)"/>`:""}
           <div class="client-avatar" style="background:${stageColor}20;color:${stageColor}">${(c.name||"?").charAt(0).toUpperCase()}</div>
           <div style="flex:1;min-width:0">
             <div class="font-bold" style="color:var(--text);font-size:15px">${c.name||"(senza nome)"}</div>
@@ -280,7 +332,8 @@ function pgClients(){
           </div>
           <div class="flex gap1" style="flex-shrink:0">
             <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openClientModal('${c.id}')">✏️</button>
-            ${!c.archived?`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();archC('${c.id}')">📦</button>`:""}
+            ${!c.archived?`<button class="btn btn-ghost btn-sm" title="Archivia" onclick="event.stopPropagation();archC('${c.id}')">📦</button>`
+              :`<button class="btn btn-ghost btn-sm" title="Ripristina" onclick="event.stopPropagation();unarchC('${c.id}')">↩️</button><button class="btn btn-danger btn-sm" title="Elimina" onclick="event.stopPropagation();delClients(['${c.id}'])">🗑</button>`}
           </div>
         </div>
         <div class="flex items-center gap2" style="flex-wrap:wrap">
@@ -292,10 +345,37 @@ function pgClients(){
       </div>`;}).join("")}
   </div></div>`;
 }
-function setF(s){_fs=s;render();}function setSR(v){_sr=v;render();}function toggleSA(){_sa=!_sa;render();}
+function setF(s){_fs=s;render();}function setSR(v){_sr=v;render();}function toggleSA(){_sa=!_sa;_selArch.clear();render();}
+function selArch(id,on){on?_selArch.add(id):_selArch.delete(id);render();}
+function selAllArch(on){S.clients.filter(c=>c.archived).forEach(c=>on?_selArch.add(c.id):_selArch.delete(c.id));render();}
 function archC(id){
   if(!confirm("Archiviare questo cliente? Rimarrà accessibile dalla sezione Archiviati."))return;
-  S.clients=S.clients.map(c=>c.id===id?{...c,archived:true,updatedAt:today()}:c);save();render();
+  S.clients=S.clients.map(c=>c.id===id?{...c,archived:true,updatedAt:today()}:c);
+  S.events=[...S.events,{id:uid(),clientId:id,date:today(),text:"Cliente archiviato",type:"edit"}];
+  if(S.page==="client"){S.page="clients";S.selClient=null;}
+  save();render();
+}
+function unarchC(id){
+  S.clients=S.clients.map(c=>c.id===id?{...c,archived:false,updatedAt:today()}:c);
+  S.events=[...S.events,{id:uid(),clientId:id,date:today(),text:"Cliente ripristinato",type:"edit"}];
+  _selArch.delete(id);
+  if(S.page==="client")S.selClient=S.clients.find(c=>c.id===id);
+  save();render();
+}
+// elimina definitivamente clienti (archiviati) insieme a progetti, pagamenti ed eventi collegati
+function delClients(ids){
+  const set=new Set(ids.filter(id=>S.clients.find(c=>c.id===id)?.archived));
+  if(!set.size)return;
+  const names=S.clients.filter(c=>set.has(c.id)).map(c=>c.name);
+  const nP=S.projects.filter(p=>set.has(p.clientId)).length,nPay=S.payments.filter(p=>set.has(p.clientId)).length;
+  if(!confirm(`Eliminare definitivamente ${set.size===1?`"${names[0]}"`:set.size+" clienti"}?\n\nVerranno eliminati anche ${nP} progetti e ${nPay} pagamenti collegati.\nL'operazione è IRREVERSIBILE.`))return;
+  S.clients=S.clients.filter(c=>!set.has(c.id));
+  S.projects=S.projects.filter(p=>!set.has(p.clientId));
+  S.payments=S.payments.filter(p=>!set.has(p.clientId));
+  S.events=S.events.filter(e=>!set.has(e.clientId));
+  set.forEach(id=>_selArch.delete(id));
+  if(S.page==="client"){S.page="clients";S.selClient=null;}
+  save();render();
 }
 
 // ─── CLIENT DETAIL ────────────────────────────────────────────────────────────
@@ -303,7 +383,8 @@ function pgDetail(){
   const c=S.clients.find(x=>x.id===S.selClient?.id)||S.selClient;
   if(!c)return`<button class="btn btn-ghost" onclick="goTo('clients')">${IC.back} Torna ai clienti</button>`;
 
-  const cProjs=S.projects.filter(p=>p.clientId===c.id&&!p.archived);
+  const cProjs=S.projects.filter(p=>p.clientId===c.id&&!p.archived&&p.stage!=="Completato");
+  const doneProjs=S.projects.filter(p=>p.clientId===c.id&&!p.archived&&p.stage==="Completato");
   const archProjs=S.projects.filter(p=>p.clientId===c.id&&p.archived);
   const cPaid=clientPaid(c.id);
   const cBudget=clientBudget(c.id);
@@ -365,6 +446,15 @@ function pgDetail(){
           ${PROJ_STAGES.map(ps=>`<button class="pill${proj.stage===ps?" active":""}" style="${proj.stage===ps?`background:${PSC[ps]};border-color:${PSC[ps]};color:#fff`:""}" onclick="chProjStage('${proj.id}','${ps}')">${ps}</button>`).join("")}
         </div>
 
+        <!-- ripartizione progetto -->
+        <div class="flex justify-between items-center mb2">
+          <div class="sec-label" style="margin:0">Ripartizione ${proj.splits?`<span class="accent" style="text-transform:none;letter-spacing:0">· personalizzata</span>`:`<span style="text-transform:none;letter-spacing:0">· default</span>`}</div>
+          <button class="btn btn-ghost btn-sm" onclick="openProjSplitModal('${proj.id}')">✏️ Modifica</button>
+        </div>
+        <div class="card-sm mb3" style="background:var(--bg)">
+          ${projSplitRows(proj).map(r=>`<div class="split-row"><span class="muted">${r.k}${r.pct!==undefined?` (${+r.pct.toFixed(1)}%)`:""}</span><span class="font-bold">${fmt(r.eur)}</span></div>`).join("")}
+        </div>
+
         <!-- payments list -->
         <div class="flex justify-between items-center mb2">
           <div class="sec-label" style="margin:0">Pagamenti</div>
@@ -380,7 +470,7 @@ function pgDetail(){
               <span class="badge" style="background:${sc2}20;color:${sc2};border:1px solid ${sc2}40;font-size:10px">${p.status||"Pagato"}</span>
             </div>
             <div class="text-xs muted">${p.note||"—"} · ${fmtD(p.date)}</div>
-            <div class="text-xs mt1">${p.customSplits?`<span style="color:var(--accent)">⚙️ ${p.customSplitsMode==="pct"?"% custom":"€ custom"}</span>`:`<span class="muted">📊 default</span>`}</div>
+            <div class="text-xs mt1">${p.customSplits?`<span style="color:var(--accent)">⚙️ ${p.customSplitsMode==="pct"?"% custom":"€ custom"}</span>`:proj.splits?`<span class="muted">📁 come progetto</span>`:`<span class="muted">📊 default</span>`}</div>
           </div>
           <div class="flex gap1">
             <button class="btn btn-ghost btn-sm" onclick="openPayModal('${c.id}','${proj.id}','${p.id}')">✏️</button>
@@ -448,6 +538,8 @@ function pgDetail(){
       <div class="flex gap2 mt1" style="flex-wrap:wrap">${sBadge(c.stage)} <span class="text-xs muted">${c.service||""}</span></div>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="openClientModal('${c.id}')">✏️ Modifica</button>
+    ${c.archived?`<button class="btn btn-ghost btn-sm" onclick="unarchC('${c.id}')">↩️ Ripristina</button><button class="btn btn-danger btn-sm" onclick="delClients(['${c.id}'])">🗑</button>`
+      :`<button class="btn btn-ghost btn-sm" onclick="archC('${c.id}')">📦 Archivia</button>`}
   </div>
 
   <!-- riepilogo economico cliente -->
@@ -484,18 +576,10 @@ function pgDetail(){
       <div class="sec-label" style="margin:0">Progetti (${cProjs.length})</div>
       <button class="btn btn-primary btn-sm" onclick="openProjModal('${c.id}',null)">${IC.plus} Nuovo progetto</button>
     </div>
-    ${cProjs.length===0?`<div class="card-sm text-sm muted" style="text-align:center;background:var(--bg)">Nessun progetto ancora. Aggiungine uno!</div>`:""}
+    ${cProjs.length===0&&!doneProjs.length&&!archProjs.length?`<div class="card-sm text-sm muted" style="text-align:center;background:var(--bg)">Nessun progetto ancora. Aggiungine uno!</div>`:""}
     ${cProjs.map(p=>projCard(p)).join("")}
-    ${archProjs.length?`
-    <div class="mt2">
-      <button onclick="toggleArchProjList()" class="flex items-center gap2 text-xs muted" style="padding:8px 0;font-weight:600">
-        <span class="chevron" id="arch-chev">${IC.chevron}</span>
-        Progetti archiviati (${archProjs.length})
-      </button>
-      <div id="arch-proj-list" style="display:none;margin-top:6px">
-        ${archProjs.map(p=>projCard(p)).join("")}
-      </div>
-    </div>`:""}
+    ${projSection("done","✅ Progetti completati",doneProjs,projCard)}
+    ${projSection("arch","📦 Progetti archiviati",archProjs,projCard)}
   </div>
 
   ${c.notes?`<div class="card"><div class="sec-label">Note cliente</div><div class="text-sm" style="white-space:pre-wrap">${c.notes}</div></div>`:""}
@@ -522,6 +606,17 @@ function pgDetail(){
   </div></div>`;
 }
 
+function projSection(key,label,list,card){
+  if(!list.length)return"";
+  const open=!!S.openSections[key];
+  return`<div class="mt3" style="border-top:1px solid var(--border);padding-top:8px">
+    <button onclick="toggleSection('${key}')" class="flex items-center gap2 text-xs muted w-full" style="padding:8px 0;font-weight:700;text-align:left">
+      <span class="chevron${open?" open":""}">${IC.chevron}</span>${label} (${list.length})
+    </button>
+    ${open?`<div style="margin-top:6px">${list.map(p=>card(p)).join("")}</div>`:""}
+  </div>`;
+}
+function toggleSection(k){S.openSections[k]=!S.openSections[k];render();}
 function toggleProj(pid){S.openProjects[pid]=!S.openProjects[pid];render();}
 function chStage(cid,stage){
   S.clients=S.clients.map(c=>c.id===cid?{...c,stage,updatedAt:today()}:c);
@@ -575,7 +670,8 @@ function pgFinance(){
   const totPending=pending.reduce((s,p)=>s+Number(p.amount),0);
   // ripartizione solo su pagamenti effettivamente incassati
   const st={};Object.keys(S.settings.splits).forEach(k=>st[k]=0);
-  paid.forEach(p=>{const sp=p.customSplits||defSplits(p.amount);Object.entries(sp).forEach(([k,v])=>{if(st[k]===undefined)st[k]=0;st[k]+=Number(v);});});
+  paid.forEach(p=>{paySplits(p).forEach(r=>{st[r.k]=(st[r.k]||0)+r.eur;});});
+  const bolloTot=paid.reduce((s,p)=>s+(p.marcaBollo?2:0),0);
   const bM=S.payments.reduce((a,p)=>{const k=p.date?.slice(0,7)||"N/A";if(!a[k])a[k]=[];a[k].push(p);return a},{});
   const bY=paid.reduce((a,p)=>{const y=p.date?.slice(0,4)||"N/A";a[y]=(a[y]||0)+Number(p.amount);return a},{});
   return`<div class="space-y-4">
@@ -585,7 +681,8 @@ function pgFinance(){
       <div><div class="sec-label">In attesa / da fatturare</div><div class="text-2xl font-black" style="color:var(--yellow)">${fmt(totPending)}</div></div>
     </div>
     <div class="sec-label">Ripartizione cumulativa (incassato)</div>
-    ${Object.entries(st).map(([k,v])=>`<div class="split-row"><span class="muted">${k}</span><span class="font-bold">${fmt(v)}</span></div>`).join("")}
+    ${orderSplits(Object.entries(st)).map(([k,v])=>`<div class="split-row"><span class="muted">${k}</span><span class="font-bold">${fmt(v)}</span></div>`).join("")}
+    ${bolloTot>0?`<div class="split-row"><span class="muted">Marche da bollo</span><span class="font-bold">${fmt(bolloTot)}</span></div>`:""}
   </div>
   <div class="flex items-center justify-between">
     <div class="flex gap2">${["mensile","annuale"].map(m=>`<button class="pill${_fv===m?" active":""}" onclick="setFV('${m}')">${m}</button>`).join("")}</div>
@@ -637,7 +734,7 @@ function pgSettings(){
     <div class="font-bold mb1">Ripartizione pagamenti</div>
     <div class="text-sm muted mb3">Totale: <strong id="split-tot" style="color:${tot!==100?"#ef4444":"#10b981"}">${tot}%</strong> — deve fare 100%</div>
     <div id="splits-list">
-      ${Object.entries(sp).map(([k,v])=>`
+      ${orderSplits(Object.entries(sp)).map(([k,v])=>`
       <div class="flex items-center gap2 mb3" data-key="${k}">
         <input class="snk" value="${k}" style="flex:1" onchange="renSplit('${k}',this.value)"/>
         <div class="stepper">
@@ -666,6 +763,17 @@ function pgSettings(){
     </div>
     <div id="bk-msg" class="text-sm mt2"></div>
   </div>
+  <div class="card">
+    <div class="font-bold mb1">🔄 Sync GitHub</div>
+    <div class="text-sm muted mb3">Sincronizza i dati con un file JSON su GitHub. Il repository deve essere <strong>privato</strong>: il push viene rifiutato su repository pubblici.</div>
+    <div class="field"><label>Token GitHub</label><input id="gh-token" type="password" autocomplete="off" placeholder="ghp_… / github_pat_…" value="${SYNC.token||""}" onchange="saveSync()"/></div>
+    <div class="field"><label>Repository (utente/repo)</label><input id="gh-repo" placeholder="olivieridomenicopodcast/nikycrm-dati" value="${SYNC.repo||""}" onchange="saveSync()"/></div>
+    <div class="flex gap2" style="flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="ghPull()">${IC.dl} Pull ⬇</button>
+      <button class="btn btn-primary" onclick="ghPush()">${IC.ul} Push ⬆</button>
+    </div>
+    <div id="gh-msg" class="text-sm mt2"></div>
+  </div>
   <div class="card" style="border-color:#ef444440">
     <div class="font-bold mb1" style="color:#ef4444">⚠️ Zona pericolo</div>
     <div class="text-sm muted mb3">Cancella tutti i dati dell'app (clienti, progetti, pagamenti, eventi). Le impostazioni vengono mantenute. Irreversibile.</div>
@@ -676,17 +784,23 @@ function pgSettings(){
 function stepSplit(k,d){S.settings.splits[k]=clamp(Number(S.settings.splits[k]||0)+d,0,100);save();render();}
 function updSplit(k,v){S.settings.splits[k]=clamp(Number(v),0,100);save();updateSplitTot();}
 function updateSplitTot(){const t=Object.values(S.settings.splits).reduce((a,v)=>a+Number(v),0);const el=document.getElementById("split-tot");if(el){el.textContent=t+"%";el.style.color=t!==100?"#ef4444":"#10b981";}}
-function renSplit(ok,nk){if(!nk||nk===ok)return;const ns={};Object.entries(S.settings.splits).forEach(([k,v])=>{ns[k===ok?nk:k]=v;});S.settings.splits=ns;save();}
+function renSplit(ok,nk){if(!nk||nk===ok)return;const ns={};Object.entries(S.settings.splits).forEach(([k,v])=>{ns[k===ok?nk:k]=v;});S.settings.splits=Object.fromEntries(orderSplits(Object.entries(ns)));save();render();}
 function remSplit(k){delete S.settings.splits[k];save();render();}
-function addSplit(){const k=document.getElementById("ns-k")?.value.trim();const v=document.getElementById("ns-v")?.value;if(k&&v){S.settings.splits[k]=clamp(Number(v),0,100);save();render();}}
+function addSplit(){const k=document.getElementById("ns-k")?.value.trim();const v=document.getElementById("ns-v")?.value;if(k&&v){S.settings.splits[k]=clamp(Number(v),0,100);S.settings.splits=Object.fromEntries(orderSplits(Object.entries(S.settings.splits)));save();render();}}
 function saveSettings(){
-  S.settings.businessName=document.getElementById("s-name")?.value||"Niky CRM";
+  S.settings.businessName=document.getElementById("s-name")?.value||"NikyCRM";
   S.settings.alertDays=Number(document.getElementById("s-days")?.value)||7;
   document.querySelectorAll("#splits-list [data-key]").forEach(r=>{const k=r.dataset.key;const i=r.querySelector(".snv");if(i)S.settings.splits[k]=clamp(Number(i.value),0,100);});
   save();render();showMsg("bk-msg","✓ Salvato","#10b981");
 }
+function buildData(){return{clients:S.clients,events:S.events,payments:S.payments,projects:S.projects,settings:S.settings,exportedAt:new Date().toISOString()};}
+function applyData(d){
+  S.clients=d.clients||[];S.events=d.events||[];S.payments=d.payments||[];
+  S.projects=d.projects||[];if(d.settings)S.settings=d.settings;normSettings();
+  save();render();
+}
 function doExport(){
-  const d={clients:S.clients,events:S.events,payments:S.payments,projects:S.projects,settings:S.settings,exportedAt:new Date().toISOString()};
+  const d=buildData();
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:"application/json"}));
   a.download=`niky-crm-backup-${today()}.json`;a.click();URL.revokeObjectURL(a.href);
 }
@@ -697,11 +811,64 @@ function doImport(inp){
       if(!d.clients)throw 0;
       const ts=d.exportedAt?new Date(d.exportedAt).toLocaleString("it-IT"):"data sconosciuta";
       if(!confirm(`Importare backup del ${ts}?\nSovrascrive TUTTI i dati attuali.`))return;
-      S.clients=d.clients||[];S.events=d.events||[];S.payments=d.payments||[];
-      S.projects=d.projects||[];if(d.settings)S.settings=d.settings;
-      save();render();showMsg("bk-msg","✓ Importato!","#10b981");
+      applyData(d);showMsg("bk-msg","✓ Importato!","#10b981");
     }catch{showMsg("bk-msg","✗ File non valido","#ef4444");}
   };r.readAsText(f);inp.value="";
+}
+// ─── SYNC GITHUB ──────────────────────────────────────────────────────────────
+function saveSync(){
+  SYNC.token=(document.getElementById("gh-token")?.value||"").trim();
+  SYNC.repo=(document.getElementById("gh-repo")?.value||"").trim().replace(/^https?:\/\/github\.com\//,"").replace(/\.git$/,"").replace(/\/$/,"");
+  LS.set("crm_sync",SYNC);
+}
+const b64enc=str=>{const b=new TextEncoder().encode(str);let s="";b.forEach(c=>s+=String.fromCharCode(c));return btoa(s);};
+const b64dec=str=>new TextDecoder().decode(Uint8Array.from(atob(str.replace(/\s/g,"")),c=>c.charCodeAt(0)));
+async function ghApi(path,opt={}){
+  const r=await fetch("https://api.github.com"+path,{...opt,headers:{Accept:"application/vnd.github+json",Authorization:"Bearer "+SYNC.token,...(opt.headers||{})}});
+  if(r.status===401)throw new Error("Token non valido");
+  if(r.status===403)throw new Error("Accesso negato (permessi del token?)");
+  return r;
+}
+function ghCheck(){
+  saveSync();
+  if(!SYNC.token){showMsg("gh-msg","✗ Inserisci il token","#ef4444");return false;}
+  if(!/^[\w.-]+\/[\w.-]+$/.test(SYNC.repo)){showMsg("gh-msg","✗ Inserisci il repository (utente/repo)","#ef4444");return false;}
+  return true;
+}
+async function ghPush(){
+  if(!ghCheck())return;
+  showMsg("gh-msg","… push in corso","var(--muted)",60000);
+  try{
+    const rr=await ghApi(`/repos/${SYNC.repo}`);
+    if(!rr.ok)throw new Error("Repository non trovato (404)");
+    if(!(await rr.json()).private)throw new Error("Il repository è pubblico: usa un repository privato");
+    const url=`/repos/${SYNC.repo}/contents/${SYNC.path}`;
+    const cur=await ghApi(url);
+    const body={message:`NikyCRM sync ${new Date().toISOString()}`,content:b64enc(JSON.stringify(buildData(),null,2))};
+    if(cur.ok)body.sha=(await cur.json()).sha;
+    else if(cur.status!==404)throw new Error("Errore GitHub "+cur.status);
+    const r=await ghApi(url,{method:"PUT",body:JSON.stringify(body)});
+    if(!r.ok)throw new Error("Push fallito ("+r.status+")");
+    showMsg("gh-msg","✓ Push completato","#10b981");
+  }catch(e){showMsg("gh-msg","✗ "+e.message,"#ef4444");}
+}
+async function ghPull(){
+  if(!ghCheck())return;
+  showMsg("gh-msg","… pull in corso","var(--muted)",60000);
+  try{
+    const r=await ghApi(`/repos/${SYNC.repo}/contents/${SYNC.path}`);
+    if(r.status===404)throw new Error("Nessun dato trovato: fai prima un push");
+    if(!r.ok)throw new Error("Pull fallito ("+r.status+")");
+    const j=await r.json();
+    let d;
+    if(j.content)d=JSON.parse(b64dec(j.content));
+    else{const raw=await ghApi(`/repos/${SYNC.repo}/contents/${SYNC.path}`,{headers:{Accept:"application/vnd.github.raw+json"}});d=JSON.parse(await raw.text());}
+    if(!d.clients)throw new Error("File non valido");
+    const ts=d.exportedAt?new Date(d.exportedAt).toLocaleString("it-IT"):"data sconosciuta";
+    if(!confirm(`Scaricare i dati del ${ts}?\nSovrascrive TUTTI i dati di questo dispositivo.`)){showMsg("gh-msg","Pull annullato","var(--muted)");return;}
+    applyData(d);
+    showMsg("gh-msg","✓ Pull completato","#10b981");
+  }catch(e){showMsg("gh-msg","✗ "+e.message,"#ef4444");}
 }
 function resetApp(){
   if(!confirm("Sei sicuro di voler cancellare TUTTI i dati?\n\nClienti, progetti, pagamenti ed eventi verranno eliminati.\nLe impostazioni verranno mantenute.\n\nQuesta operazione è IRREVERSIBILE."))return;
@@ -710,7 +877,7 @@ function resetApp(){
   save();S.page="dashboard";S.selClient=null;render();
   alert("Reset completato. L'app è stata svuotata.");
 }
-function showMsg(id,msg,c){const el=document.getElementById(id);if(el){el.textContent=msg;el.style.color=c;setTimeout(()=>{if(el)el.textContent="";},3000);}}
+function showMsg(id,msg,c,ms=3000){const el=document.getElementById(id);if(el){el.textContent=msg;el.style.color=c;clearTimeout(el._t);el._t=setTimeout(()=>{if(el)el.textContent="";},ms);}}
 
 // ─── CLIENT MODAL ─────────────────────────────────────────────────────────────
 function closeModal(){document.getElementById("mo")?.remove();}
@@ -860,15 +1027,6 @@ function toggleTimeline(){
   body.style.display=open?"block":"none";
   if(chev)chev.style.transform=open?"rotate(90deg)":"";
 }
-function toggleArchProjList(){
-  const list=document.getElementById("arch-proj-list");
-  const chev=document.getElementById("arch-chev");
-  if(!list)return;
-  const open=list.style.display==="none";
-  list.style.display=open?"block":"none";
-  if(chev) chev.style.transform=open?"rotate(90deg)":"";
-}
-
 function calcProjTotal(){
   const sv=document.getElementById("pj-sv")?.value||"";
   const inps=document.getElementById("pj-inps")?.checked||false;
@@ -933,7 +1091,8 @@ function saveProj(pid,clientId,isEx){
     archived:false
   };
   if(isEx==="true"){
-    S.projects=S.projects.map(x=>x.id===pid?p:x);
+    // mantiene i campi non presenti nel form (ripartizione, archivio, materiale)
+    S.projects=S.projects.map(x=>x.id===pid?{...x,...p,archived:x.archived||false,splits:x.splits||null}:x);
     S.events=[...S.events,{id:uid(),clientId,date:today(),text:`Progetto "${name}" aggiornato`,type:"edit"}];
   } else {
     S.projects=[...S.projects,p];
@@ -945,155 +1104,139 @@ function saveProj(pid,clientId,isEx){
   save();closeModal();render();
 }
 
-// ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
-// _pcs = array of {id, name, value} — free rows
-let _puc=false, _pcs=[], _pcsMode="eur";
-
-function openPayModal(preClientId, preProjectId, editPayId){
-  const existing=editPayId?S.payments.find(p=>p.id===editPayId):null;
-  _puc=!!(existing?.customSplits);
-  _pcsMode=existing?.customSplitsMode||"eur";
-  // restore saved rows or start empty
-  if(existing?.customSplits){
-    _pcs=Object.entries(existing.customSplits).map(([name,value])=>({id:uid(),name,value:Number(value)}));
-  } else {
-    _pcs=[];
+// ─── SPLIT EDITOR (condiviso da progetto e pagamento) ─────────────────────────
+// Stato per editor: {on,mode:"pct"|"eur",rows:[{id,name,value}],cinq,focus,areaId,title,offNote,getAmt,seed,offHtml}
+const SPE={};
+function speInit(key,cfg){SPE[key]={on:false,mode:"pct",rows:[],cinq:false,focus:null,...cfg};}
+function speAmt(e){return Number(e.getAmt())||0;}
+function speRender(key){
+  const e=SPE[key];if(!e)return;
+  const area=document.getElementById(e.areaId);if(!area)return;
+  const amt=speAmt(e);
+  const head=`<div class="toggle-wrap" onclick="speToggle('${key}')">
+      <div class="toggle${e.on?" on":""}"></div>
+      <div><div class="font-bold text-sm">${e.title}</div>
+      <div class="text-xs muted">${e.offNote}</div></div>
+    </div>`;
+  if(!e.on){
+    area.innerHTML=`<div class="card-sm mb3" style="background:var(--bg)">${head}${e.offHtml?`<div class="mt3">${e.offHtml()}</div>`:""}</div>`;
+    return;
   }
-
-  const ac=S.clients.filter(c=>!c.archived);
-  if(!ac.length){alert("Nessun cliente attivo.");return;}
-  const effClientId=existing?.clientId||preClientId||ac[0]?.id;
-  const effProjectId=existing?.projectId||preProjectId||null;
-
-  function projOpts(cid){
-    const ps=S.projects.filter(p=>p.clientId===cid&&!p.archived);
-    if(!ps.length)return`<option value="">— nessun progetto —</option>`;
-    return`<option value="">— nessun progetto specifico —</option>`+
-      ps.map(p=>`<option value="${p.id}"${p.id===effProjectId?" selected":""}>${p.name}</option>`).join("");
+  e.rows=orderSplits(e.rows,r=>r.name); // "Per me" sempre in fondo
+  const unit=e.mode==="pct"?"%":"€";
+  const step=e.mode==="pct"?5:10;
+  const tot=e.rows.reduce((s,r)=>s+Number(r.value||0),0);
+  const diff=e.mode==="eur"?amt-tot:null;
+  const ok=e.mode==="pct"?Math.abs(tot-100)<0.01:Math.abs(diff)<0.01;
+  const stColor=ok?"#10b981":"#ef4444";
+  const disp=e.mode==="pct"?calcSplits(e.rows.map(r=>[r.name,r.value]),amt,e.cinq).map(r=>r.eur):[];
+  const cinqSwitch=e.mode==="pct"?`<div class="toggle-wrap mb3" style="gap:8px" onclick="speCinq('${key}')">
+      <div class="toggle${e.cinq?" on":""}" style="flex-shrink:0"></div>
+      <div class="text-sm"><strong>Arrotonda alla cinquina</strong><br/><span class="muted" style="font-size:11px">Esuberi di ogni voce → all'ultima</span></div>
+    </div>`:"";
+  const rows=e.rows.map((r,i)=>`
+      <div class="mb3" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px">
+        <div class="flex items-center gap2 mb2">
+          <input type="text" value="${(r.name||"").replace(/"/g,"&quot;")}" placeholder="Nome voce..."
+            style="flex:1;font-size:13px;padding:6px 10px;min-width:0"
+            oninput="speName('${key}','${r.id}',this.value)" onchange="speRender('${key}')"/>
+          <button class="stepper-btn" type="button" onclick="speDel('${key}','${r.id}')" style="color:#ef4444;flex-shrink:0">✕</button>
+        </div>
+        <div class="flex items-center gap2">
+          <button class="stepper-btn" type="button" onclick="speStep('${key}','${r.id}',-${step})">−</button>
+          <input type="number" id="sv-${key}-${r.id}" value="${e.mode==="pct"?(+r.value).toFixed(1):(+r.value).toFixed(2)}"
+            style="flex:1;text-align:center;min-width:0${e.focus===r.id?";border-color:var(--accent)":""}"
+            onfocus="speFocus('${key}','${r.id}')" onchange="speVal('${key}','${r.id}',this.value)"/>
+          <button class="stepper-btn" type="button" onclick="speStep('${key}','${r.id}',${step})">+</button>
+          <span class="muted text-sm" style="flex-shrink:0">${unit}</span>
+          ${e.mode==="pct"?`<span class="text-sm accent font-bold" style="flex-shrink:0">${fmt(disp[i])}</span>`:""}
+        </div>
+      </div>`).join("");
+  area.innerHTML=`<div class="card-sm mb3" style="background:var(--bg)">
+      ${head}
+      <div class="flex gap2 mt3 mb3">
+        <button class="btn btn-sm ${e.mode==="pct"?"btn-primary":"btn-ghost"}" type="button" onclick="speMode('${key}','pct')">% Percentuale</button>
+        <button class="btn btn-sm ${e.mode==="eur"?"btn-primary":"btn-ghost"}" type="button" onclick="speMode('${key}','eur')">€ Importo fisso</button>
+      </div>
+      <div class="sec-label">Ripartizione — ${unit} personalizzata</div>
+      ${cinqSwitch}
+      ${rows}
+      <button class="btn btn-ghost btn-sm mt2 mb3" onclick="speAdd('${key}')" type="button">+ Aggiungi voce</button>
+      <div class="split-row" style="border-top:1px solid var(--border);padding-top:8px">
+        ${e.mode==="pct"
+          ?`<span class="font-bold">Totale %</span><span class="font-bold" style="color:${stColor}">${tot.toFixed(1)}%</span>`
+          :`<span class="font-bold">Non assegnato</span><span class="font-bold" style="color:${stColor}">${fmt(diff)}</span>`}
+      </div>
+    </div>`;
+}
+function speToggle(key){
+  const e=SPE[key];e.on=!e.on;
+  if(e.on&&e.rows.length===0){ // parte dalla ripartizione ereditata, già modificabile
+    e.mode="pct";e.cinq=false;
+    e.rows=orderSplits(e.seed().map(([name,value])=>({id:uid(),name,value:Number(value)||0})),r=>r.name);
   }
+  speRender(key);
+}
+function speCinq(key){const e=SPE[key];e.cinq=!e.cinq;speRender(key);}
+function speMode(key,m){
+  const e=SPE[key];if(e.mode===m)return;
+  const a=speAmt(e);
+  e.rows=e.rows.map(r=>({...r,value:m==="eur"?+(a*r.value/100).toFixed(2):(a>0?+(r.value/a*100).toFixed(2):0)}));
+  e.mode=m;if(m==="eur")e.cinq=false;
+  speRender(key);
+}
+function speAdd(key){const e=SPE[key];const r={id:uid(),name:"",value:0};e.rows.push(r);e.focus=r.id;speRender(key);}
+function speDel(key,id){const e=SPE[key];e.rows=e.rows.filter(r=>r.id!==id);if(e.focus===id)e.focus=null;speRender(key);}
+function speName(key,id,v){const r=SPE[key].rows.find(r=>r.id===id);if(r)r.name=v;}
+function speFocus(key,id){SPE[key].focus=id;}
+// onchange: il campo ha già perso il focus, si può ridisegnare
+function speVal(key,id,v){const r=SPE[key].rows.find(r=>r.id===id);if(r)r.value=Math.max(0,Number(v)||0);speRender(key);}
+function speStep(key,id,d){
+  const e=SPE[key];const r=e.rows.find(r=>r.id===id);if(!r)return;
+  r.value=e.mode==="pct"?Math.max(0,Math.min(100,(r.value||0)+d)):Math.max(0,(r.value||0)+d);
+  e.focus=id;speRender(key);
+}
+// righe valide pronte per il salvataggio ("Per me" in fondo)
+function speResult(key){
+  const e=SPE[key];
+  if(!e.on)return null;
+  const rows=orderSplits(e.rows.filter(r=>r.name&&r.name.trim()),r=>r.name).map(r=>({name:r.name.trim(),value:Number(r.value)||0}));
+  return rows.length?{mode:e.mode,cinq:e.mode==="pct"&&e.cinq,rows}:null;
+}
 
-  const ov=document.createElement("div");ov.className="modal-overlay";ov.id="mo";
-  ov.onclick=e=>{if(e.target===ov)closeModal();};
-  ov.innerHTML=`<div class="modal">
-    <div class="modal-header">
-      <span class="font-bold">${existing?"Modifica pagamento":"Registra pagamento"}</span>
-      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="field"><label>Cliente</label>
-        <select id="pf-cl" onchange="updateProjSelect()">${ac.map(c=>`<option value="${c.id}"${c.id===effClientId?" selected":""}>${c.name}</option>`).join("")}</select>
-      </div>
-      <div class="field"><label>Progetto (opzionale)</label>
-        <select id="pf-pr">${projOpts(effClientId)}</select>
-      </div>
-      <div class="grid2">
-        <div class="field"><label>Importo (€)</label>
-          <input id="pf-a" type="number" placeholder="0" value="${existing?.amountBase||""}" oninput="onPayChange()"/>
-        </div>
-        <div class="field"><label>Data</label>
-          <input id="pf-d" type="date" value="${existing?.date||today()}"/>
-        </div>
-      </div>
-      <div class="field"><label>Stato pagamento</label>
-        <select id="pf-status" onchange="onPayChange()">
-          ${PAY_STATUS.map(s=>`<option value="${s}"${(existing?.status||"Pagato")===s?" selected":""}>${s}</option>`).join("")}
-        </select>
-      </div>
-      <!-- mini calculator -->
-      <div class="card-sm mb3" style="background:var(--bg)">
-        <div class="sec-label mb2">🧮 Calcolatrice rapida</div>
-        <div class="flex gap2 mb2">
-          <input id="calc-display" type="text" value="0" readonly style="flex:1;text-align:right;font-size:18px;font-weight:700;color:var(--accent);background:var(--surface)"/>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
-          <button type="button" onclick="calcKey('7')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">7</button>
-          <button type="button" onclick="calcKey('8')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">8</button>
-          <button type="button" onclick="calcKey('9')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">9</button>
-          <button type="button" onclick="calcKey('/')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0;color:var(--accent)">÷</button>
-          <button type="button" onclick="calcKey('4')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">4</button>
-          <button type="button" onclick="calcKey('5')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">5</button>
-          <button type="button" onclick="calcKey('6')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">6</button>
-          <button type="button" onclick="calcKey('*')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0;color:var(--accent)">×</button>
-          <button type="button" onclick="calcKey('1')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">1</button>
-          <button type="button" onclick="calcKey('2')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">2</button>
-          <button type="button" onclick="calcKey('3')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">3</button>
-          <button type="button" onclick="calcKey('-')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0;color:var(--accent)">−</button>
-          <button type="button" onclick="calcKey('0')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">0</button>
-          <button type="button" onclick="calcKey('.')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">.</button>
-          <button type="button" onclick="calcKey('=')" class="btn btn-primary btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">=</button>
-          <button type="button" onclick="calcKey('+')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0;color:var(--accent)">+</button>
-          <button type="button" onclick="calcKey('C')" class="btn btn-danger btn-sm" style="justify-content:center;font-size:13px;font-weight:700;grid-column:1/3">C</button>
-          <button type="button" onclick="calcKey('AMT')" class="btn btn-green btn-sm" style="justify-content:center;font-size:11px;font-weight:700;grid-column:3/5">→ Importo</button>
-        </div>
-      </div>
-      <div class="field"><label>Nota</label>
-        <input id="pf-no" placeholder="Es: acconto 50%, saldo finale..." value="${existing?.note||""}"/>
-      </div>
-      <label class="toggle-wrap mb3" style="gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px">
-        <input type="checkbox" id="pf-bollo" ${existing?.marcaBollo?"checked":""} onchange="onPayChange()" style="width:auto;accent-color:var(--accent)"/>
-        <div>
-          <div class="font-bold text-sm">Marca da bollo €2,00</div>
-          <div class="text-xs muted">Verrà aggiunta all'importo incassato</div>
-        </div>
-      </label>
-      <div class="card-sm mb3" style="background:var(--bg)">
-        <label class="toggle-wrap mb2" onclick="togglePayCustom()">
-          <div class="toggle${_puc?" on":""}" id="pay-tog"></div>
-          <div><div class="font-bold text-sm">Ripartizione personalizzata</div>
-          <div class="text-xs muted">Off = % default · On = voci libere</div></div>
-        </label>
-        <div id="pcs-mode-row" style="display:${_puc?"flex":"none"};gap:8px;margin-top:8px">
-          <button id="pcs-btn-pct" class="btn btn-sm ${_pcsMode==="pct"?"btn-primary":"btn-ghost"}" onclick="setPcsMode('pct')">% Percentuale</button>
-          <button id="pcs-btn-eur" class="btn btn-sm ${_pcsMode==="eur"?"btn-primary":"btn-ghost"}" onclick="setPcsMode('eur')">€ Importo fisso</button>
-        </div>
-      </div>
-      <div id="pay-split-area"></div>
-      <div class="flex gap2 justify-between mt3">
-        <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
-        <button class="btn btn-primary" onclick="savePay('${existing?.id||""}')">
-          ${existing?"Salva modifiche":"Registra pagamento"}
-        </button>
+// ─── CALCOLATRICE RAPIDA (si apre dal tastino) ────────────────────────────────
+let _calcVal="0", _calcOp=null, _calcPrev=null, _calcJustOp=false;
+window._calcApply=null;
+function calcBlock(amtLabel){
+  _calcVal="0";_calcOp=null;_calcPrev=null;_calcJustOp=false;
+  const k=(label,key,extra="")=>`<button type="button" onclick="calcKey('${key}')" class="btn btn-ghost btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0;${extra}">${label}</button>`;
+  const op=(l,key)=>k(l,key,"color:var(--accent)");
+  return`<div class="mb3">
+    <button type="button" class="btn btn-ghost btn-sm" onclick="toggleCalc()" id="calc-btn">🧮 Calcolatrice rapida</button>
+    <div id="calc-box" class="card-sm mt2" style="display:none;background:var(--bg)">
+      <div class="sec-label mb2">🧮 Calcolatrice rapida</div>
+      <div class="flex gap2 mb2"><input id="calc-display" type="text" value="0" readonly style="flex:1;text-align:right;font-size:18px;font-weight:700;color:var(--accent);background:var(--surface)"/></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+        ${k("7","7")}${k("8","8")}${k("9","9")}${op("÷","/")}
+        ${k("4","4")}${k("5","5")}${k("6","6")}${op("×","*")}
+        ${k("1","1")}${k("2","2")}${k("3","3")}${op("−","-")}
+        ${k("0","0")}${k(".",".")}<button type="button" onclick="calcKey('=')" class="btn btn-primary btn-sm" style="justify-content:center;font-size:15px;font-weight:700;padding:10px 0">=</button>${op("+","+")}
+        <button type="button" onclick="calcKey('C')" class="btn btn-danger btn-sm" style="justify-content:center;font-size:13px;font-weight:700;grid-column:1/3">C</button>
+        <button type="button" onclick="calcKey('AMT')" class="btn btn-green btn-sm" style="justify-content:center;font-size:11px;font-weight:700;grid-column:3/5">→ ${amtLabel}</button>
       </div>
     </div>
   </div>`;
-  document.body.appendChild(ov);
-  onPayChange();
 }
-
-function setPcsMode(mode){
-  _pcsMode=mode;
-  _pcs=[];
-  const bp=document.getElementById("pcs-btn-pct");
-  const be=document.getElementById("pcs-btn-eur");
-  if(bp) bp.className=`btn btn-sm ${mode==="pct"?"btn-primary":"btn-ghost"}`;
-  if(be) be.className=`btn btn-sm ${mode==="eur"?"btn-primary":"btn-ghost"}`;
-  onPayChange();
+function toggleCalc(){
+  const b=document.getElementById("calc-box");if(!b)return;
+  b.style.display=b.style.display==="none"?"block":"none";
 }
-
-function updateProjSelect(){
-  const cid=document.getElementById("pf-cl")?.value;
-  const sel=document.getElementById("pf-pr");if(!sel)return;
-  const ps=S.projects.filter(p=>p.clientId===cid&&!p.archived);
-  sel.innerHTML=`<option value="">— nessun progetto specifico —</option>`+
-    ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
-}
-
-function togglePayCustom(){
-  _puc=!_puc;
-  if(!_puc) _pcs=[];
-  const t=document.getElementById("pay-tog");if(t) t.className="toggle"+(_puc?" on":"");
-  const mr=document.getElementById("pcs-mode-row");if(mr) mr.style.display=_puc?"flex":"none";
-  onPayChange();
-}
-
-let _calcVal="0", _calcOp=null, _calcPrev=null, _calcJustOp=false;
 function calcKey(k){
   const d=document.getElementById("calc-display");if(!d)return;
   if(k==="C"){
     _calcVal="0";_calcOp=null;_calcPrev=null;_calcJustOp=false;
   } else if(k==="AMT"){
-    const ai=document.getElementById("pf-a");
-    if(ai){ai.value=parseFloat(_calcVal)||0;onPayChange();}
+    if(window._calcApply)window._calcApply(parseFloat(_calcVal)||0);
     return;
   } else if(["+","-","*","/"].includes(k)){
     if(_calcOp!==null&&!_calcJustOp){
@@ -1128,150 +1271,166 @@ function calcKey(k){
   }
   if(d)d.value=_calcVal;
 }
-window._cinqOn=false;
-function toggleCinq(){
-  window._cinqOn=!window._cinqOn;
-  const t=document.getElementById("cinq-tog");
-  if(t)t.className="toggle"+(window._cinqOn?" on":"");
+
+// ─── RIPARTIZIONE DEL PROGETTO ────────────────────────────────────────────────
+function openProjSplitModal(pid){
+  const proj=S.projects.find(p=>p.id===pid);if(!proj)return;
+  const amount=Number(proj.amount)||0;
+  speInit("proj",{
+    areaId:"ps-area",title:"Ripartizione personalizzata",
+    offNote:"Off = % default delle Impostazioni · On = voci libere",
+    getAmt:()=>amount,
+    seed:()=>Object.entries(S.settings.splits),
+    offHtml:()=>calcSplits(Object.entries(S.settings.splits),amount,false).map(r=>`<div class="split-row"><span class="muted">${r.k} (${r.pct}%)</span><span class="font-bold">${fmt(r.eur)}</span></div>`).join("")
+  });
+  const sp=proj.splits;
+  if(sp&&sp.rows?.length){
+    const e=SPE.proj;e.on=true;e.mode=sp.mode||"pct";e.cinq=!!sp.cinq;
+    e.rows=sp.rows.map(r=>({id:uid(),name:r.name,value:Number(r.value)||0}));
+  }
+  window._calcApply=v=>{
+    const e=SPE.proj;
+    if(!e.on||!e.focus||!e.rows.find(r=>r.id===e.focus)){alert("Attiva la ripartizione personalizzata e tocca prima il campo della voce da compilare.");return;}
+    const r=e.rows.find(r=>r.id===e.focus);r.value=Math.max(0,v);speRender("proj");
+  };
+  const ov=document.createElement("div");ov.className="modal-overlay";ov.id="mo";
+  ov.onclick=e=>{if(e.target===ov)closeModal();};
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header"><span class="font-bold">Ripartizione progetto</span><button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="card-sm mb3" style="background:var(--bg)">
+        <div class="text-sm font-bold">📁 ${proj.name||"Progetto"}</div>
+        <div class="flex justify-between items-center mt2"><span class="text-xs upper muted">Totale progetto</span><span class="font-black" style="color:var(--accent)">${fmt(amount)}</span></div>
+      </div>
+      <div class="text-xs muted mb3">Vale per tutti i pagamenti del progetto. In ogni singolo pagamento puoi, se vuoi, impostarne una diversa.</div>
+      ${calcBlock("Voce selezionata")}
+      <div id="ps-area"></div>
+      <div class="flex gap2 justify-between mt3">
+        <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+        <button class="btn btn-primary" onclick="saveProjSplit('${pid}')">Salva ripartizione</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  speRender("proj");
+}
+function saveProjSplit(pid){
+  const proj=S.projects.find(p=>p.id===pid);if(!proj)return;
+  const res=speResult("proj");
+  S.projects=S.projects.map(p=>p.id===pid?{...p,splits:res}:p);
+  S.events=[...S.events,{id:uid(),clientId:proj.clientId,date:today(),text:`Ripartizione progetto "${proj.name}" ${res?"personalizzata":"ripristinata al default"}`,type:"edit"}];
+  S.selClient=S.clients.find(c=>c.id===proj.clientId)||S.selClient;
+  save();closeModal();render();
+}
+
+// ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
+function openPayModal(preClientId, preProjectId, editPayId){
+  const existing=editPayId?S.payments.find(p=>p.id===editPayId):null;
+  const ac=S.clients.filter(c=>!c.archived);
+  if(!ac.length){alert("Nessun cliente attivo.");return;}
+  const effClientId=existing?.clientId||preClientId||ac[0]?.id;
+  const effProjectId=existing?.projectId||preProjectId||null;
+
+  speInit("pay",{
+    areaId:"pay-split-area",title:"Ripartizione personalizzata (opzionale)",
+    offNote:"Off = vale la ripartizione del progetto",
+    getAmt:()=>Number(document.getElementById("pf-a")?.value||0),
+    seed:()=>{
+      const proj=S.projects.find(p=>p.id===document.getElementById("pf-pr")?.value);
+      const e=proj?.splits?defPctEntries(proj.splits):[];
+      return e.length?e:Object.entries(S.settings.splits);
+    }
+  });
+  if(existing?.customSplits){
+    const e=SPE.pay;e.on=true;e.mode=existing.customSplitsMode||"eur";e.cinq=!!existing.customSplitsCinq;
+    e.rows=Object.entries(existing.customSplits).map(([name,value])=>({id:uid(),name,value:Number(value)}));
+  }
+  window._calcApply=v=>{const ai=document.getElementById("pf-a");if(ai){ai.value=v;onPayChange();}};
+
+  function projOpts(cid){
+    const ps=S.projects.filter(p=>p.clientId===cid&&!p.archived);
+    if(!ps.length)return`<option value="">— nessun progetto —</option>`;
+    return`<option value="">— nessun progetto specifico —</option>`+
+      ps.map(p=>`<option value="${p.id}"${p.id===effProjectId?" selected":""}>${p.name}</option>`).join("");
+  }
+
+  const ov=document.createElement("div");ov.className="modal-overlay";ov.id="mo";
+  ov.onclick=e=>{if(e.target===ov)closeModal();};
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header">
+      <span class="font-bold">${existing?"Modifica pagamento":"Registra pagamento"}</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Cliente</label>
+        <select id="pf-cl" onchange="updateProjSelect()">${ac.map(c=>`<option value="${c.id}"${c.id===effClientId?" selected":""}>${c.name}</option>`).join("")}</select>
+      </div>
+      <div class="field"><label>Progetto (opzionale)</label>
+        <select id="pf-pr">${projOpts(effClientId)}</select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Importo (€)</label>
+          <input id="pf-a" type="number" placeholder="0" value="${existing?(existing.amountBase??existing.amount):""}" oninput="onPayChange()"/>
+        </div>
+        <div class="field"><label>Data</label>
+          <input id="pf-d" type="date" value="${existing?.date||today()}"/>
+        </div>
+      </div>
+      <div class="field"><label>Stato pagamento</label>
+        <select id="pf-status" onchange="onPayChange()">
+          ${PAY_STATUS.map(s=>`<option value="${s}"${(existing?.status||"Pagato")===s?" selected":""}>${s}</option>`).join("")}
+        </select>
+      </div>
+      ${calcBlock("Importo")}
+      <div class="field"><label>Nota</label>
+        <input id="pf-no" placeholder="Es: acconto 50%, saldo finale..." value="${existing?.note||""}"/>
+      </div>
+      <label class="toggle-wrap mb3" style="gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px">
+        <input type="checkbox" id="pf-bollo" ${existing?.marcaBollo?"checked":""} onchange="onPayChange()" style="width:auto;accent-color:var(--accent)"/>
+        <div>
+          <div class="font-bold text-sm">Marca da bollo €2,00</div>
+          <div class="text-xs muted">Verrà aggiunta all'importo incassato</div>
+        </div>
+      </label>
+      <div id="pay-split-area"></div>
+      <div id="pay-total-area"></div>
+      <div class="flex gap2 justify-between mt3">
+        <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
+        <button class="btn btn-primary" onclick="savePay('${existing?.id||""}')">
+          ${existing?"Salva modifiche":"Registra pagamento"}
+        </button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  speRender("pay");
   onPayChange();
 }
-function addSplitRow(){
-  _pcs.push({id:uid(),name:"",value:0});
-  onPayChange();
-}
-function removeSplitRow(rowId){
-  _pcs=_pcs.filter(r=>r.id!==rowId);
-  onPayChange();
-}
-function setSplitName(rowId,val){
-  const r=_pcs.find(r=>r.id===rowId);if(r) r.name=val;
-}
-function setSplitVal(rowId,val){
-  const r=_pcs.find(r=>r.id===rowId);if(r) r.value=Math.max(0,Number(val)||0);
-  onPayChange();
-}
-function stepSplitVal(rowId,delta){
-  const r=_pcs.find(r=>r.id===rowId);if(!r)return;
-  if(_pcsMode==="pct") r.value=Math.max(0,Math.min(100,(r.value||0)+delta));
-  else r.value=Math.max(0,(r.value||0)+delta);
-  onPayChange();
+
+function updateProjSelect(){
+  const cid=document.getElementById("pf-cl")?.value;
+  const sel=document.getElementById("pf-pr");if(!sel)return;
+  const ps=S.projects.filter(p=>p.clientId===cid&&!p.archived);
+  sel.innerHTML=`<option value="">— nessun progetto specifico —</option>`+
+    ps.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
 }
 
 function onPayChange(){
   const amt=Number(document.getElementById("pf-a")?.value||0);
   const bollo=document.getElementById("pf-bollo")?.checked||false;
   const status=document.getElementById("pf-status")?.value||"Pagato";
-  const totalAmt=amt+(bollo?2:0);
-  const area=document.getElementById("pay-split-area");if(!area)return;
-  if(!amt){area.innerHTML="";return;}
   const isPaid=status==="Pagato";
-  const splitLabel=isPaid?"Ripartizione effettiva":"Ripartizione pianificata";
   const totalLabel=isPaid?"Totale incassato":"Totale previsto";
   const totalColor=isPaid?"var(--green)":"var(--yellow)";
-  const cinqOn=window._cinqOn||false;
-  const cinqSwitch=`<label class="toggle-wrap mb3" style="gap:8px;cursor:pointer" onclick="toggleCinq()">
-    <div class="toggle${cinqOn?" on":""}" id="cinq-tog" style="flex-shrink:0"></div>
-    <div class="text-sm"><strong>Arrotonda alla cinquina</strong><br/><span class="muted" style="font-size:11px">Esuberi di ogni voce → all'ultima</span></div>
-  </label>`;
-
-  // helper: apply cinquina rounding to an array of {name,value(pct)} entries
-  function applyCinq(entries){
-    if(!cinqOn||!amt) return entries.map(([k,v])=>({k,v,display:amt*v/100}));
-    let rem=0;
-    return entries.map(([k,v],i)=>{
-      const raw=amt*v/100;
-      const rounded=Math.floor(raw/5)*5;
-      rem+=raw-rounded;
-      const display=i===entries.length-1?rounded+rem:rounded;
-      return{k,v,display};
-    });
-  }
-
-  if(!_puc){
-    const entries=Object.entries(S.settings.splits);
-    const rows=applyCinq(entries);
-    area.innerHTML=`<div class="card-sm mb3" style="background:var(--bg)">
-      <div class="sec-label">${splitLabel} — default</div>
-      ${cinqSwitch}
-      ${rows.map(r=>`<div class="split-row"><span class="muted">${r.k} (${r.v}%)</span><span class="font-bold">${fmt(r.display)}</span></div>`).join("")}
+  const tot=document.getElementById("pay-total-area");
+  if(tot)tot.innerHTML=amt?`<div class="card-sm mb3" style="background:var(--bg)">
       ${bollo?`<div class="split-row"><span class="muted">Marca da bollo</span><span class="font-bold">+ ${fmt(2)}</span></div>`:""}
-      <div class="split-row" style="border-top:1px solid var(--border);padding-top:6px">
-        <span class="font-bold">${totalLabel}</span><span class="font-black" style="color:${totalColor}">${fmt(totalAmt)}</span>
-      </div>
-    </div>`;
-  } else {
-    const unit=_pcsMode==="pct"?"%":"€";
-    const step=_pcsMode==="pct"?5:10;
-    const totAssigned=_pcs.reduce((s,r)=>s+Number(r.value||0),0);
-    const diff=_pcsMode==="eur"?(amt-totAssigned):null;
-    const pctOk=_pcsMode==="pct"&&Math.abs(totAssigned-100)<0.01;
-    const eurOk=_pcsMode==="eur"&&Math.abs(diff)<0.01;
-    const statusColor=(pctOk||eurOk)?"#10b981":"#ef4444";
-
-    // compute display values with optional cinquina
-    let displayPcs=_pcs.map(r=>({...r,_display:amt*r.value/100}));
-    if(cinqOn&&_pcsMode==="pct"&&amt>0){
-      let remainder=0;
-      displayPcs=_pcs.map((r,i)=>{
-        const raw=amt*r.value/100;
-        const rounded=Math.floor(raw/5)*5;
-        remainder+=raw-rounded;
-        return{...r,_display:i===_pcs.length-1?rounded+remainder:rounded};
-      });
-    }
-
-    const rows=displayPcs.map(r=>`
-      <div class="mb3" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px">
-        <div class="flex items-center gap2 mb2">
-          <input type="text" value="${(r.name||"").replace(/"/g,"&quot;")}" placeholder="Nome voce..."
-            style="flex:1;font-size:13px;padding:6px 10px;min-width:0"
-            oninput="setSplitName('${r.id}',this.value)"/>
-          <button class="stepper-btn" type="button" onclick="removeSplitRow('${r.id}')" style="color:#ef4444;flex-shrink:0">✕</button>
-        </div>
-        <div class="flex items-center gap2">
-          <button class="stepper-btn" type="button" onclick="stepSplitVal('${r.id}',-${step})">−</button>
-          <input type="number" id="sv-${r.id}" value="${_pcsMode==="pct"?(+r.value).toFixed(1):(+r.value).toFixed(2)}"
-            style="flex:1;text-align:center;min-width:0"
-            onblur="setSplitValFinal('${r.id}',this.value)"/>
-          <button class="stepper-btn" type="button" onclick="stepSplitVal('${r.id}',${step})">+</button>
-          <span class="muted text-sm" style="flex-shrink:0">${unit}</span>
-          ${_pcsMode==="pct"?`<span class="text-sm accent font-bold" style="flex-shrink:0">${fmt(r._display)}</span>`:""}
-        </div>
-      </div>`).join("");
-
-    area.innerHTML=`<div class="card-sm mb3" style="background:var(--bg)">
-      <div class="sec-label">${splitLabel} — ${unit} personalizzata</div>
-      ${_pcsMode==="pct"?cinqSwitch:""}
-      ${rows}
-      <button class="btn btn-ghost btn-sm mt2 mb3" onclick="addSplitRow()" type="button">+ Aggiungi voce</button>
-      <div class="split-row" style="border-top:1px solid var(--border);padding-top:8px">
-        ${_pcsMode==="pct"
-          ?`<span class="font-bold">Totale %</span><span class="font-bold" style="color:${statusColor}">${totAssigned.toFixed(1)}%</span>`
-          :`<span class="font-bold">Non assegnato</span><span class="font-bold" style="color:${statusColor}">${fmt(diff)}</span>`
-        }
-      </div>
-      ${bollo?`<div class="split-row"><span class="muted">Marca da bollo</span><span class="font-bold">+ ${fmt(2)}</span></div>`:""}
-      <div class="split-row"><span class="font-bold">${totalLabel}</span><span class="font-black" style="color:${totalColor}">${fmt(totalAmt)}</span></div>
-    </div>`;
-  }
+      <div class="split-row"><span class="font-bold">${totalLabel}</span><span class="font-black" style="color:${totalColor}">${fmt(amt+(bollo?2:0))}</span></div>
+    </div>`:"";
+  // gli importi per voce dipendono dall'importo
+  if(SPE.pay?.on)speRender("pay");
 }
-function addSplitRow(){_pcs.push({id:uid(),name:"",value:0});onPayChange();}
-function removeSplitRow(rowId){_pcs=_pcs.filter(r=>r.id!==rowId);onPayChange();}
-function setSplitName(rowId,val){const r=_pcs.find(r=>r.id===rowId);if(r)r.name=val;}
-// Called on blur so keyboard stays open while typing
-function setSplitValFinal(rowId,val){
-  const r=_pcs.find(r=>r.id===rowId);if(!r)return;
-  r.value=Math.max(0,Number(val)||0);
-  onPayChange(); // safe to redraw now since field lost focus
-}
-function setSplitVal(rowId,val){const r=_pcs.find(r=>r.id===rowId);if(r)r.value=Math.max(0,Number(val)||0);}
-function stepSplitVal(rowId,delta){
-  const r=_pcs.find(r=>r.id===rowId);if(!r)return;
-  if(_pcsMode==="pct")r.value=Math.max(0,Math.min(100,(r.value||0)+delta));
-  else r.value=Math.max(0,(r.value||0)+delta);
-  onPayChange();
-}
-function stepCS(){}function setCS(){}function stepCSPct(){}function setCSPct(){}
+
 
 function savePay(editId){
   const amt=Number(document.getElementById("pf-a")?.value||0);
@@ -1289,10 +1448,12 @@ function savePay(editId){
     amount:totalAmt, amountBase:amt, marcaBollo:bollo,
     status, date, note
   };
-  if(_puc&&_pcs.length>0){
-    // convert array of {id,name,value} to {name:value} object
-    pay.customSplits=Object.fromEntries(_pcs.filter(r=>r.name).map(r=>[r.name,r.value]));
-    pay.customSplitsMode=_pcsMode;
+  const cs=speResult("pay");
+  if(cs){
+    // ripartizione facoltativa del singolo pagamento: {nome:valore} ("Per me" in fondo)
+    pay.customSplits=Object.fromEntries(cs.rows.map(r=>[r.name,r.value]));
+    pay.customSplitsMode=cs.mode;
+    pay.customSplitsCinq=cs.cinq;
   }
 
   if(editId){
@@ -1316,7 +1477,7 @@ function savePay(editId){
 
 // ─── SERVICE WORKER ───────────────────────────────────────────────────────────
 if("serviceWorker" in navigator){
-  const sw=`const C="niky-crm-v3",F=["./","./index.html","./manifest.json","./icon-192.png","./icon-512.png"];
+  const sw=`const C="nikycrm-v4",F=["./","./index.html","./manifest.json","./icon-192.png","./icon-512.png"];
 self.addEventListener("install",e=>e.waitUntil(caches.open(C).then(c=>c.addAll(F))));
 self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;
   navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:"application/javascript"}))).catch(()=>{});
