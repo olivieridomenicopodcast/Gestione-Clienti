@@ -196,7 +196,7 @@ function projSplitRows(proj){
     if(sp.mode==="eur")return orderSplits(sp.rows.map(r=>({k:r.name,eur:Number(r.value)||0})),x=>x.k);
     return calcSplits(defPctEntries(sp),amt,sp.cinq);
   }
-  return calcSplits(Object.entries(S.settings.splits),amt,false);
+  return[]; // nessuna ripartizione: si imposta a mano in ogni progetto
 }
 // ─── IMPONIBILE / INPS / RESIDUO PROGETTO ─────────────────────────────────────
 const INPS_RATE=0.04, r2=n=>Math.round((Number(n)||0)*100)/100;
@@ -222,7 +222,7 @@ function paySplits(p){
   }
   const proj=p.projectId?S.projects.find(x=>x.id===p.projectId):null;
   if(proj?.splits){const e=defPctEntries(proj.splits);if(e.length)return calcSplits(e,base,proj.splits.cinq);}
-  return calcSplits(Object.entries(S.settings.splits),base,false);
+  return[]; // le % delle Impostazioni sono solo un promemoria, non contano
 }
 
 function sBadge(stage,map){
@@ -462,13 +462,13 @@ function pgDetail(){
 
         <!-- ripartizione progetto -->
         <div class="flex justify-between items-center mb2">
-          <div class="sec-label" style="margin:0">Ripartizione ${proj.splits?`<span class="accent" style="text-transform:none;letter-spacing:0">· personalizzata</span>`:`<span style="text-transform:none;letter-spacing:0">· default</span>`}</div>
+          <div class="sec-label" style="margin:0">Ripartizione</div>
           <button class="btn btn-ghost btn-sm" onclick="openProjSplitModal('${proj.id}')">✏️ Modifica</button>
         </div>
-        <div class="card-sm mb3" style="background:var(--bg)">
+        ${proj.splits?`<div class="card-sm mb3" style="background:var(--bg)">
           ${(()=>{const reg={};pPays.forEach(pp=>paySplits(pp).forEach(r=>{reg[r.k]=(reg[r.k]||0)+r.eur;}));
             return projSplitRows(proj).map(r=>`<div class="split-row"><span class="muted">${r.k}${r.pct!==undefined?` (${+r.pct.toFixed(1)}%)`:""}</span><span class="font-bold">${fmt(r.eur)}${pPays.length?` <span class="text-xs muted" style="font-weight:500">· nei pagamenti ${fmt(reg[r.k]||0)}</span>`:""}</span></div>`).join("");})()}
-        </div>
+        </div>`:`<div class="text-xs muted mb3">Nessuna ripartizione impostata. Premi Modifica per inserirla.</div>`}
         ${proj.amount>0?`<div class="card-sm mb3" style="background:var(--bg)">
           <div class="split-row"><span class="muted">Pagamenti registrati (base${proj.rivalsaINPS?", senza INPS":""})</span><span class="font-bold">${fmt(projRegistered(proj.id))} su ${fmt(projNet(proj))}</span></div>
           <div class="split-row"><span class="font-bold">Residuo da registrare</span><span class="font-black" style="color:${projResidual(proj)<-0.005?"var(--red)":"var(--accent)"}">${fmt(projResidual(proj))}</span></div>
@@ -490,7 +490,7 @@ function pgDetail(){
             </div>
             <div class="text-xs muted">${p.note||"—"} · ${fmtD(p.date)}</div>
             ${proj.rivalsaINPS?`<div class="text-xs muted">${fmt(payNet(p))} + ${fmt(Number(p.amountBase??p.amount)-payNet(p))} INPS 4%</div>`:""}
-            <div class="text-xs mt1">${p.customSplits?`<span style="color:var(--accent)">⚙️ ${p.customSplitsMode==="pct"?"% custom":"€ custom"}</span>`:proj.splits?`<span class="muted">📁 come progetto</span>`:`<span class="muted">📊 default</span>`}</div>
+            <div class="text-xs mt1">${p.customSplits?`<span style="color:var(--accent)">⚙️ ${p.customSplitsMode==="pct"?"% custom":"€ custom"}</span>`:proj.splits?`<span class="muted">📁 come progetto</span>`:`<span class="muted">— nessuna ripartizione</span>`}</div>
           </div>
           <div class="flex gap1">
             <button class="btn btn-ghost btn-sm" onclick="openPayModal('${c.id}','${proj.id}','${p.id}')">✏️</button>
@@ -689,7 +689,7 @@ function pgFinance(){
   const tot=paid.reduce((s,p)=>s+Number(p.amount),0);
   const totPending=pending.reduce((s,p)=>s+Number(p.amount),0);
   // ripartizione solo su pagamenti effettivamente incassati
-  const st={};Object.keys(S.settings.splits).forEach(k=>st[k]=0);
+  const st={};
   paid.forEach(p=>{paySplits(p).forEach(r=>{st[r.k]=(st[r.k]||0)+r.eur;});});
   const bolloTot=paid.reduce((s,p)=>s+(p.marcaBollo?2:0),0);
   const bM=S.payments.reduce((a,p)=>{const k=p.date?.slice(0,7)||"N/A";if(!a[k])a[k]=[];a[k].push(p);return a},{});
@@ -701,6 +701,7 @@ function pgFinance(){
       <div><div class="sec-label">In attesa / da fatturare</div><div class="text-2xl font-black" style="color:var(--yellow)">${fmt(totPending)}</div></div>
     </div>
     <div class="sec-label">Ripartizione cumulativa (incassato)</div>
+    ${Object.keys(st).length===0?`<div class="text-xs muted">Nessuna ripartizione impostata nei progetti/pagamenti incassati.</div>`:""}
     ${orderSplits(Object.entries(st)).map(([k,v])=>`<div class="split-row"><span class="muted">${k}</span><span class="font-bold">${fmt(v)}</span></div>`).join("")}
     ${bolloTot>0?`<div class="split-row"><span class="muted">Marche da bollo</span><span class="font-bold">${fmt(bolloTot)}</span></div>`:""}
   </div>
@@ -751,8 +752,9 @@ function pgSettings(){
     <div class="field"><label>Giorni per alert follow-up</label><input id="s-days" type="number" value="${S.settings.alertDays||7}" min="1"/></div>
   </div>
   <div class="card">
-    <div class="font-bold mb1">Ripartizione pagamenti</div>
-    <div class="text-sm muted mb3">Totale: <strong id="split-tot" style="color:${tot!==100?"#ef4444":"#10b981"}">${tot}%</strong> — deve fare 100%</div>
+    <div class="font-bold mb1">Ripartizione pagamenti (promemoria)</div>
+    <div class="text-sm muted mb2">Solo un'indicazione per te: <strong>non viene usata</strong> nei progetti né nei pagamenti, dove la ripartizione si imposta sempre a mano.</div>
+    <div class="text-sm muted mb3">Totale: <strong id="split-tot" style="color:${tot!==100?"#ef4444":"#10b981"}">${tot}%</strong> </div>
     <div id="splits-list">
       ${orderSplits(Object.entries(sp)).map(([k,v])=>`
       <div class="flex items-center gap2 mb3" data-key="${k}">
@@ -793,12 +795,6 @@ function pgSettings(){
       <button class="btn btn-primary" onclick="ghPush()">${IC.ul} Push ⬆</button>
     </div>
     <div id="gh-msg" class="text-sm mt2"></div>
-  </div>
-  <div class="card">
-    <div class="font-bold mb1">🧰 Sistema ripartizioni</div>
-    <div class="text-sm muted mb3">Per i progetti con un solo pagamento che ha una ripartizione personalizzata e il progetto senza: sposta quei valori nella ripartizione del progetto. Il pagamento resta com'è. Prima mostra un'anteprima.</div>
-    <button class="btn btn-ghost" onclick="fixSplits()">Sistema ripartizioni</button>
-    <div id="fx-msg" class="text-sm mt2"></div>
   </div>
   <div class="card" style="border-color:#ef444440">
     <div class="font-bold mb1" style="color:#ef4444">⚠️ Zona pericolo</div>
@@ -841,36 +837,6 @@ function doImport(inp){
     }catch{showMsg("bk-msg","✗ File non valido","#ef4444");}
   };r.readAsText(f);inp.value="";
 }
-// ─── SISTEMA RIPARTIZIONI (da pagamento a progetto) ───────────────────────────
-function fixSplits(){
-  const todo=[],skipped=[];
-  S.projects.forEach(pr=>{
-    if(pr.splits)return;
-    const pays=S.payments.filter(p=>p.projectId===pr.id);
-    const withCs=pays.filter(p=>p.customSplits);
-    if(!withCs.length)return;
-    const cl=S.clients.find(c=>c.id===pr.clientId)?.name||"—";
-    const label=`${cl} · ${pr.name}`;
-    if(pays.length!==1){skipped.push(`${label}: più pagamenti, da sistemare a mano`);return;}
-    const pay=withCs[0],mode=pay.customSplitsMode||"eur";
-    const rows=orderSplits(Object.entries(pay.customSplits),x=>x[0]).map(([name,value])=>({name,value:Number(value)||0}));
-    if(mode==="eur"){
-      const sum=rows.reduce((t,r)=>t+r.value,0);
-      if(Math.abs(sum-Number(pr.amount||0))>0.05){skipped.push(`${label}: la ripartizione (${fmt(sum)}) non coincide col totale progetto (${fmt(pr.amount)})`);return;}
-    }
-    todo.push({pr,pay,label,split:{mode,cinq:!!pay.customSplitsCinq&&mode==="pct",rows}});
-  });
-  if(!todo.length){showMsg("fx-msg",skipped.length?"Niente da sistemare. Saltati: "+skipped.join("; "):"✓ Niente da sistemare","var(--muted)",9000);return;}
-  const txt=todo.map(t=>`• ${t.label}: ${t.split.rows.map(r=>`${r.name} ${r.value}${t.split.mode==="pct"?"%":"€"}`).join(", ")}`).join("\n");
-  if(!confirm(`Spostare la ripartizione dal pagamento al progetto?\n\n${txt}${skipped.length?"\n\nSaltati:\n"+skipped.join("\n"):""}`))return;
-  todo.forEach(t=>{
-    S.projects=S.projects.map(x=>x.id===t.pr.id?{...x,splits:t.split}:x);
-    S.payments=S.payments.map(x=>{if(x.id!==t.pay.id)return x;const{customSplits,customSplitsMode,customSplitsCinq,...rest}=x;return rest;});
-    S.events=[...S.events,{id:uid(),clientId:t.pr.clientId,date:today(),text:`Ripartizione spostata dal pagamento al progetto "${t.pr.name}"`,type:"edit"}];
-  });
-  save();render();showMsg("fx-msg",`✓ Sistemati ${todo.length} progetti`,"#10b981",6000);
-}
-
 // ─── SYNC GITHUB ──────────────────────────────────────────────────────────────
 function saveSync(){
   SYNC.token=(document.getElementById("gh-token")?.value||"").trim();
@@ -1169,7 +1135,7 @@ function speRender(key){
   const e=SPE[key];if(!e)return;
   const area=document.getElementById(e.areaId);if(!area)return;
   const amt=speAmt(e);
-  const head=`<div class="toggle-wrap" onclick="speToggle('${key}')">
+  const head=e.noToggle?"":`<div class="toggle-wrap" onclick="speToggle('${key}')">
       <div class="toggle${e.on?" on":""}"></div>
       <div><div class="font-bold text-sm">${e.title}</div>
       <div class="text-xs muted">${e.offNote}</div></div>
@@ -1195,22 +1161,22 @@ function speRender(key){
         <div class="flex items-center gap2 mb2">
           <input type="text" value="${(r.name||"").replace(/"/g,"&quot;")}" placeholder="Nome voce..."
             style="flex:1;font-size:13px;padding:6px 10px;min-width:0"
-            oninput="speName('${key}','${r.id}',this.value)" onchange="speRender('${key}')"/>
+            oninput="speName('${key}','${r.id}',this.value)"/>
           <button class="stepper-btn" type="button" onclick="speDel('${key}','${r.id}')" style="color:#ef4444;flex-shrink:0">✕</button>
         </div>
         <div class="flex items-center gap2">
           <button class="stepper-btn" type="button" onclick="speStep('${key}','${r.id}',-${step})">−</button>
           <input type="number" id="sv-${key}-${r.id}" value="${e.mode==="pct"?(+r.value).toFixed(1):(+r.value).toFixed(2)}"
             style="flex:1;text-align:center;min-width:0${e.focus===r.id?";border-color:var(--accent)":""}"
-            onfocus="speFocus('${key}','${r.id}')" onchange="speVal('${key}','${r.id}',this.value)"/>
+            onfocus="speFocus('${key}','${r.id}')" oninput="speVal('${key}','${r.id}',this.value)"/>
           <button class="stepper-btn" type="button" onclick="speStep('${key}','${r.id}',${step})">+</button>
           <span class="muted text-sm" style="flex-shrink:0">${unit}</span>
-          ${e.mode==="pct"?`<span class="text-sm accent font-bold" style="flex-shrink:0">${fmt(disp[i])}</span>`:""}
+          ${e.mode==="pct"?`<span id="sdv-${key}-${r.id}" class="text-sm accent font-bold" style="flex-shrink:0">${fmt(disp[i])}</span>`:""}
         </div>
       </div>`).join("");
   area.innerHTML=`<div class="card-sm mb3" style="background:var(--bg)">
       ${head}
-      <div class="flex gap2 mt3 mb3">
+      <div class="flex gap2 ${e.noToggle?"":"mt3 "}mb3">
         <button class="btn btn-sm ${e.mode==="pct"?"btn-primary":"btn-ghost"}" type="button" onclick="speMode('${key}','pct')">% Percentuale</button>
         <button class="btn btn-sm ${e.mode==="eur"?"btn-primary":"btn-ghost"}" type="button" onclick="speMode('${key}','eur')">€ Importo fisso</button>
       </div>
@@ -1218,12 +1184,23 @@ function speRender(key){
       ${cinqSwitch}
       ${rows}
       <button class="btn btn-ghost btn-sm mt2 mb3" onclick="speAdd('${key}')" type="button">+ Aggiungi voce</button>
-      <div class="split-row" style="border-top:1px solid var(--border);padding-top:8px">
-        ${e.mode==="pct"
-          ?`<span class="font-bold">Totale %</span><span class="font-bold" style="color:${stColor}">${tot.toFixed(1)}%</span>`
-          :`<span class="font-bold">Non assegnato</span><span class="font-bold" style="color:${stColor}">${fmt(diff)}</span>`}
-      </div>
+      <div class="split-row" id="stt-${key}" style="border-top:1px solid var(--border);padding-top:8px">${speTotals(e)}</div>
     </div>`;
+}
+function speTotals(e){
+  const amt=speAmt(e),tot=e.rows.reduce((s,r)=>s+Number(r.value||0),0);
+  const diff=amt-tot,ok=e.mode==="pct"?Math.abs(tot-100)<0.01:Math.abs(diff)<0.01,c=ok?"#10b981":"#ef4444";
+  return e.mode==="pct"
+    ?`<span class="font-bold">Totale %</span><span class="font-bold" style="color:${c}">${tot.toFixed(1)}%</span>`
+    :`<span class="font-bold">Non assegnato</span><span class="font-bold" style="color:${c}">${fmt(diff)}</span>`;
+}
+// aggiorna importi e totali senza ridisegnare i campi (così i tap sui bottoni non si perdono)
+function speRefresh(key){
+  const e=SPE[key];if(e.mode==="pct"){
+    const d=calcSplits(e.rows.map(r=>[r.name,r.value]),speAmt(e),e.cinq).map(r=>r.eur);
+    e.rows.forEach((r,i)=>{const el=document.getElementById(`sdv-${key}-${r.id}`);if(el)el.textContent=fmt(d[i]);});
+  }
+  const t=document.getElementById("stt-"+key);if(t)t.innerHTML=speTotals(e);
 }
 function speToggle(key){
   const e=SPE[key];e.on=!e.on;
@@ -1245,8 +1222,7 @@ function speAdd(key){const e=SPE[key];const r={id:uid(),name:"",value:0};e.rows.
 function speDel(key,id){const e=SPE[key];e.rows=e.rows.filter(r=>r.id!==id);if(e.focus===id)e.focus=null;speRender(key);}
 function speName(key,id,v){const r=SPE[key].rows.find(r=>r.id===id);if(r)r.name=v;}
 function speFocus(key,id){SPE[key].focus=id;}
-// onchange: il campo ha già perso il focus, si può ridisegnare
-function speVal(key,id,v){const r=SPE[key].rows.find(r=>r.id===id);if(r)r.value=Math.max(0,Number(v)||0);speRender(key);}
+function speVal(key,id,v){const r=SPE[key].rows.find(r=>r.id===id);if(r)r.value=Math.max(0,Number(v)||0);speRefresh(key);}
 function speStep(key,id,d){
   const e=SPE[key];const r=e.rows.find(r=>r.id===id);if(!r)return;
   r.value=e.mode==="pct"?Math.max(0,Math.min(100,(r.value||0)+d)):Math.max(0,(r.value||0)+d);
@@ -1334,10 +1310,9 @@ function openProjSplitModal(pid){
   const amount=Number(proj.amount)||0;
   speInit("proj",{
     areaId:"ps-area",title:"Ripartizione personalizzata",
-    offNote:"Off = % default delle Impostazioni · On = voci libere",
+    offNote:"",
     getAmt:()=>amount,
-    seed:()=>Object.entries(S.settings.splits),
-    offHtml:()=>calcSplits(Object.entries(S.settings.splits),amount,false).map(r=>`<div class="split-row"><span class="muted">${r.k} (${r.pct}%)</span><span class="font-bold">${fmt(r.eur)}</span></div>`).join("")
+    noToggle:true,on:true,seed:()=>[]
   });
   const sp=proj.splits;
   if(sp&&sp.rows?.length){
@@ -1358,7 +1333,7 @@ function openProjSplitModal(pid){
         <div class="text-sm font-bold">📁 ${proj.name||"Progetto"}</div>
         <div class="flex justify-between items-center mt2"><span class="text-xs upper muted">Totale progetto</span><span class="font-black" style="color:var(--accent)">${fmt(amount)}</span></div>
       </div>
-      <div class="text-xs muted mb3">Vale per tutti i pagamenti del progetto. In ogni singolo pagamento puoi, se vuoi, impostarne una diversa.</div>
+      <div class="text-xs muted mb3">Ripartizione complessiva del progetto: la scrivi a mano, per ogni progetto. In ogni singolo pagamento puoi, se vuoi, impostarne una diversa.</div>
       ${calcBlock("Voce selezionata")}
       <div id="ps-area"></div>
       <div class="flex gap2 justify-between mt3">
@@ -1390,12 +1365,12 @@ function openPayModal(preClientId, preProjectId, editPayId){
 
   speInit("pay",{
     areaId:"pay-split-area",title:"Ripartizione personalizzata (opzionale)",
-    offNote:"Off = vale la ripartizione del progetto",
+    offNote:"Off = vale la ripartizione del progetto (se c'è)",
     getAmt:()=>payCalc().baseInps,
     seed:()=>{
       const proj=S.projects.find(p=>p.id===document.getElementById("pf-pr")?.value);
       const e=proj?.splits?defPctEntries(proj.splits):[];
-      return e.length?e:Object.entries(S.settings.splits);
+      return e;
     }
   });
   if(existing?.customSplits){
