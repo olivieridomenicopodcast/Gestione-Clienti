@@ -536,6 +536,11 @@ function pgDetail(){
             <div class="text-xs muted">${proj.materialeRicevuto?'✅ Ricevuto':'⏳ In attesa'}</div>
           </div>
         </div>
+        <!-- Epidemic Sound -->
+        <div class="mb3">
+          <div class="sec-label mb2">🎵 Epidemic Sound</div>
+          <textarea rows="3" placeholder="Note, link, playlist, brani scelti…" oninput="setEpidemic('${proj.id}',this.value)">${(proj.epidemicSound||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</textarea>
+        </div>
         <!-- edit/archive project -->
         <div class="flex gap2 mt3">
           <button class="btn btn-ghost btn-sm" onclick="openProjModal('${c.id}','${proj.id}')">✏️ Modifica</button>
@@ -649,6 +654,8 @@ function chProjStage(pid,stage){
   S.events=[...S.events,{id:uid(),clientId:proj.clientId,date:today(),text:`Progetto "${proj.name}" → ${stage}`,type:"stage"}];
   S.selClient=S.clients.find(c=>c.id===proj.clientId);save();render();
 }
+// salva mentre scrivi, senza ridisegnare (la tastiera resta aperta)
+function setEpidemic(pid,v){S.projects=S.projects.map(p=>p.id===pid?{...p,epidemicSound:v}:p);save();}
 function toggleMateriale(pid){
   S.projects=S.projects.map(p=>p.id===pid?{...p,materialeRicevuto:!p.materialeRicevuto}:p);
   S.selClient=S.selClient?S.clients.find(cl=>cl.id===S.selClient.id):null;
